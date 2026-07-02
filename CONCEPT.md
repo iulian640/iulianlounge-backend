@@ -25,8 +25,9 @@ Speakeasy elegante y oscuro, años 20-30:
 - Técnica: geometría contenida + PBR con roughness variado (madera mate, latón
   brillante, cristal) + bloom sutil. La atmósfera la hace la luz, no el polycount.
 - **El letrero "Iulian's"**: nombre del club dentro de la ficción. Cartel
-  luminoso dentro del lounge, estilo Fallout pre-bomba (retro-americana,
-  neón/bombillas cálidas, tipografía de época) — pieza de arte destacada,
+  luminoso dentro del lounge, estilo Fallout pre-bomba pero con **bombillas
+  cálidas y latón** (marquee retro-americana, tipografía de época; nada de neón
+  atómico, que casaría mal con los años 20-30) — pieza de arte destacada,
   candidata a emissive + bloom. La marca del proyecto sigue siendo IulianLounge.
 
 ## Cámara y control
