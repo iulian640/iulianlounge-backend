@@ -160,6 +160,42 @@ se nota en cómo te trata el barman.
 | De la Casa | "A partir de hoy, cuando llames a la puerta, di tu nombre. Con eso basta." | "From tonight, when you knock, just say your name. That's all it takes." |
 | Socio | "Las llaves de la VIP. Iulian dejó dicho que sabría a quién dárselas. ...No sé qué vio, pero aquí están." | "Keys to the VIP room. Iulian said I'd know who to give them to. ...No idea what he saw. Here." |
 
+## Las salas — DECIDIDO (2026-07-03)
+
+| Código (Room.code) | ES | EN | Nota |
+|---|---|---|---|
+| MAIN | **El Salón** | **The Parlor** | Barra, mesa de cartas, escenario de jazz |
+| BACKROOM | **La Trastienda** | **The Back Room** | La terminal de retos. Por la trastienda se entra a los speakeasies de verdad |
+| VIP | **La Eterna** | **The Long Game** | Por la leyenda: la partida eterna de Iulian. En EN, doble sentido: "the long game" = la estrategia paciente que te trajo hasta aquí |
+
+## Textos de UI con voz de club
+
+> Hasta los errores hablan como Iulian's. Cada texto será una clave i18n
+> (ADR-06): el backend devuelve códigos, el frontend resuelve. Borrador
+> para vetar.
+
+### Pantallas de carga (rotan al azar)
+| ES | EN |
+|---|---|
+| "Abriendo la trastienda..." | "Unlocking the back room..." |
+| "Encendiendo el letrero..." | "Warming up the marquee..." |
+| "Afinando el piano..." | "Tuning the piano..." |
+| "Contando los chikilicuatres..." | "Counting the Shrutebucks..." |
+
+### Errores y estados
+| Situación | ES | EN |
+|---|---|---|
+| Login incorrecto (401) | "Aquí no te conocemos. O el santo y seña está mal." | "We don't know you. Or the password's wrong." |
+| Sesión caducada (401) | "Te has quedado dormido en la barra. Vuelve a entrar." | "You fell asleep at the bar. Come back in." |
+| Página no existe (404) | "Esa puerta no existe. Y si existiera, no tendrías la llave." | "That door doesn't exist. And if it did, you wouldn't have the key." |
+| Sala bloqueada (403) | "Gente de la casa. Tú aún no." | "House people only. Not you. Yet." |
+| Saldo insuficiente (422) | "Eso cuesta más chikilicuatres de los que llevas encima." | "That costs more Shrutebucks than you're carrying." |
+| Nombre ya en uso (409) | "Ese nombre ya lo usa otro parroquiano." | "Another regular already goes by that name." |
+| Demasiadas peticiones (429) | "Tranquilo, chaval. La barra atiende de uno en uno." | "Easy, kid. The bar serves one at a time." |
+| Error del servidor (500) | "Algo se ha roto detrás de la barra. No preguntes." | "Something broke behind the bar. Don't ask." |
+| Historial vacío | "Aún no has movido un chikilicuatre." | "You haven't moved a single Shrutebuck yet." |
+| Sin conexión | "El club está cerrado. ¿Redada o inventario? Quién sabe." | "The club is closed. Raid or inventory? Who knows." |
+
 ## Extras para días sueltos (no plan)
 
 - **Voz de Cursaito (TTS)**: las frases del catálogo son fijas → se pueden
