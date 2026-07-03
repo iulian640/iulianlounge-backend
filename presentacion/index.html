@@ -187,7 +187,19 @@
       <li><strong>9 ADRs</strong>: cada decisión técnica grande, documentada con sus alternativas</li>
       <li><strong>10 riesgos</strong> identificados el día 0 — con su mitigación</li>
     </ul>
-    <div class="todo">enseñar 1 ADR en pantalla (candidato: ledger append-only) y contar una decisión en 60 segundos.</div>
+  </section>
+
+  <!-- 5b · Qué es un ADR -->
+  <section class="slide">
+    <div class="kicker">El proceso · decisiones</div>
+    <h2>ADR: cada decisión, <em>por escrito</em></h2>
+    <p class="lead" style="margin-bottom:3vh;"><strong style="color:var(--gold-soft);">Architecture Decision Record</strong> — un documento corto por cada decisión técnica importante: el problema, qué elegimos, qué descartamos y qué pagamos a cambio. Estructura fija: <em>Contexto → Decisión → Alternativas → Consecuencias</em>.</p>
+    <ul class="points" style="max-width:44em;">
+      <li><strong>ADR-04 · El ledger</strong> — los saldos no se machacan: cada movimiento es una fila nueva. La economía se audita como un banco</li>
+      <li><strong>ADR-08 · Dos tokens JWT</strong> — access de 15 min + refresh de 7 días: seguridad de token corto, comodidad de sesión larga</li>
+      <li><strong>ADR-05 · IA sin poderes</strong> — el barman conversa con tus datos reales, pero jamás mueve fichas: el prompt injection se queda sin premio</li>
+    </ul>
+    <p class="lead" style="margin-top:3vh; color:var(--muted);">Dentro de dos meses, "¿por qué lo hiciste así?" tiene respuesta escrita. En una entrevista, también.</p>
   </section>
 
   <!-- 6 · Proceso: planificación -->
