@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IulianLounge — Presentación</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #120e0a;
+    --bg-panel: #1b1510;
+    --green: #16352a;
+    --gold: #c9a227;
+    --gold-soft: #e6c86a;
+    --cream: #f2e8d5;
+    --muted: #9c8e74;
+    --shadow: 0 30px 80px rgba(0,0,0,.55);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--cream);
+    font-family: 'Jost', system-ui, sans-serif;
+    font-weight: 300;
+    overflow: hidden;
+  }
+  .deck { height: 100%; position: relative; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    padding: 7vh 9vw;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% -10%, rgba(201,162,39,.10), transparent 60%),
+      radial-gradient(ellipse 70% 60% at 85% 110%, rgba(22,53,42,.55), transparent 65%),
+      var(--bg);
+  }
+  .slide.active { display: flex; }
+  .kicker {
+    color: var(--gold);
+    letter-spacing: .35em;
+    text-transform: uppercase;
+    font-size: clamp(.65rem, 1.2vw, .85rem);
+    margin-bottom: 2.2vh;
+    font-weight: 500;
+  }
+  h1, h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    line-height: 1.05;
+    font-weight: 700;
+  }
+  h1 { font-size: clamp(2.6rem, 7.5vw, 6.5rem); }
+  h2 { font-size: clamp(2rem, 4.6vw, 3.8rem); margin-bottom: 4vh; }
+  h2 em { color: var(--gold-soft); font-style: italic; }
+  p.lead { font-size: clamp(1.05rem, 1.9vw, 1.5rem); max-width: 34em; color: var(--cream); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 4vw; align-items: start; }
+  ul.points { list-style: none; font-size: clamp(1rem, 1.6vw, 1.3rem); }
+  ul.points li {
+    padding: 1.1vh 0 1.1vh 2em;
+    position: relative;
+    border-bottom: 1px solid rgba(201,162,39,.14);
+  }
+  ul.points li::before {
+    content: "◆"; position: absolute; left: .2em;
+    color: var(--gold); font-size: .7em; top: 50%; transform: translateY(-50%);
+  }
+  ul.points li strong { font-weight: 500; color: var(--gold-soft); }
+  .todo {
+    border: 1px dashed rgba(201,162,39,.5);
+    background: rgba(201,162,39,.06);
+    color: var(--muted);
+    padding: 1.4em 1.6em;
+    font-size: clamp(.9rem, 1.4vw, 1.1rem);
+    margin-top: 3vh;
+    max-width: 46em;
+  }
+  .todo::before { content: "⏳ RELLENAR — "; color: var(--gold); font-weight: 500; letter-spacing: .08em; }
+  .marquee {
+    display: inline-block;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
+    color: var(--gold-soft);
+    text-shadow: 0 0 18px rgba(230,200,106,.45), 0 0 60px rgba(201,162,39,.25);
+  }
+  .frame {
+    border: 1px solid rgba(201,162,39,.35);
+    outline: 1px solid rgba(201,162,39,.12);
+    outline-offset: 6px;
+    padding: 6vh 5vw;
+    box-shadow: var(--shadow);
+    background: linear-gradient(160deg, rgba(27,21,16,.9), rgba(18,14,10,.95));
+    align-self: center;
+    text-align: center;
+    max-width: 900px;
+  }
+  .sig { margin-top: 4vh; color: var(--muted); font-size: clamp(.85rem, 1.3vw, 1rem); letter-spacing: .12em; }
+  table.plan { border-collapse: collapse; font-size: clamp(.85rem, 1.4vw, 1.15rem); width: 100%; }
+  table.plan td, table.plan th { padding: .55em .9em; text-align: left; border-bottom: 1px solid rgba(201,162,39,.16); }
+  table.plan th { color: var(--gold); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; font-size: .8em; }
+  table.plan td:first-child { color: var(--gold-soft); white-space: nowrap; }
+  .hud {
+    position: fixed; bottom: 2.2vh; left: 0; right: 0;
+    display: flex; justify-content: center; gap: .55em;
+    z-index: 10; pointer-events: none;
+  }
+  .hud .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(242,232,213,.18); transition: all .25s; }
+  .hud .dot.on { background: var(--gold); box-shadow: 0 0 8px rgba(201,162,39,.8); }
+  .counter {
+    position: fixed; bottom: 1.8vh; right: 2.2vw;
+    color: var(--muted); font-size: .8rem; letter-spacing: .15em;
+  }
+  .help {
+    position: fixed; bottom: 1.8vh; left: 2.2vw;
+    color: rgba(156,142,116,.5); font-size: .72rem; letter-spacing: .1em;
+  }
+  @media print {
+    body { overflow: visible; }
+    .slide { display: flex !important; position: relative; page-break-after: always; height: 100vh; }
+    .hud, .counter, .help { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- 1 · Portada -->
+  <section class="slide">
+    <div class="frame">
+      <div class="kicker">Proyecto final · Bootcamp Fullstack</div>
+      <h1>Iulian<span class="marquee">Lounge</span></h1>
+      <p class="lead" style="margin:3vh auto 0;">Un speakeasy virtual navegable en 3D.<br>Entras siendo un don nadie. Sales siendo socio del club.</p>
+      <div class="sig">IULIAN TIMOFEI · OCTUBRE 2026</div>
+    </div>
+  </section>
+
+  <!-- 2 · Qué es -->
+  <section class="slide">
+    <div class="kicker">El producto</div>
+    <h2>Un videojuego en el navegador<br>con un <em>backend serio</em> detrás</h2>
+    <div class="cols">
+      <ul class="points">
+        <li>Bar clandestino años 20 en <strong>3D</strong>: paseas, apuestas, prosperas</li>
+        <li>Ganas fichas: <strong>katas de código</strong>, blackjack, el negocio del bar</li>
+        <li>Un <strong>barman con IA</strong> que sabe quién eres — y te fía si te arruinas</li>
+        <li>El bar crece <strong>físicamente</strong> con tu progreso</li>
+      </ul>
+      <ul class="points">
+        <li><strong>Java + Spring Boot</strong> · PostgreSQL · JWT</li>
+        <li><strong>Vue + Three.js</strong> · responsive (móvil = experiencia 2D)</li>
+        <li>TDD · CI/CD · ADRs · i18n ES/EN</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 3 · Demo -->
+  <section class="slide">
+    <div class="kicker">Demo</div>
+    <h2>Pasen y <em>vean</em></h2>
+    <p class="lead">Demo en vivo: registro → entrar al lounge → jugar una mano → resolver una kata → hablar con el barman.</p>
+    <div class="todo">guion exacto de la demo + plan B (vídeo grabado por si el directo falla). Se prepara en el Sprint 7.</div>
+  </section>
+
+  <!-- 4 · El concepto -->
+  <section class="slide">
+    <div class="kicker">El diseño</div>
+    <h2>Cuatro sistemas que son <em>uno</em></h2>
+    <ul class="points" style="max-width:38em;">
+      <li><strong>Narrativa</strong> — tu ascenso de don nadie a socio</li>
+      <li><strong>Economía</strong> — una sola moneda: las fichas del club</li>
+      <li><strong>Espacio</strong> — subir de estatus desbloquea salas reales</li>
+      <li><strong>Avatar</strong> — empiezas con ropa humilde, acabas de seda y oro</li>
+    </ul>
+    <p class="lead" style="margin-top:3vh; color:var(--muted);">Progresar en la economía ES progresar en la historia, el espacio y el aspecto.</p>
+  </section>
+
+  <!-- 5 · Proceso: fase 0 -->
+  <section class="slide">
+    <div class="kicker">El proceso · 1</div>
+    <h2>Primero pensar, <em>luego</em> picar</h2>
+    <ul class="points" style="max-width:40em;">
+      <li><strong>Concepto</strong> cerrado y escrito antes de la primera línea de código</li>
+      <li><strong>Arquitectura</strong>: ~20 entidades, API REST completa, diagramas Mermaid</li>
+      <li><strong>9 ADRs</strong>: cada decisión técnica grande, documentada con sus alternativas</li>
+      <li><strong>10 riesgos</strong> identificados el día 0 — con su mitigación</li>
+    </ul>
+    <div class="todo">enseñar 1 ADR en pantalla (candidato: ledger append-only) y contar una decisión en 60 segundos.</div>
+  </section>
+
+  <!-- 6 · Proceso: planificación -->
+  <section class="slide">
+    <div class="kicker">El proceso · 2</div>
+    <h2>14 semanas, <em>7 sprints</em></h2>
+    <table class="plan">
+      <tr><th>Sprint</th><th>Entregable</th></tr>
+      <tr><td>S1 · Auth + Wallet</td><td>Backend con usuarios, JWT y economía de fichas</td></tr>
+      <tr><td>S2 · Lounge 3D</td><td>Figma, bar navegable, login real, HUD</td></tr>
+      <tr><td>S3 · Blackjack</td><td>Apuestas reales, autoridad total del servidor</td></tr>
+      <tr><td>S4 · Katas</td><td>Terminal de retos con anti-trampas</td></tr>
+      <tr><td>S5 · Tienda + negocio</td><td>Avatar, ropa, ingresos pasivos</td></tr>
+      <tr><td>S6 · Barman IA + social</td><td>Function calling, préstamos, rankings</td></tr>
+      <tr><td>S7 · Entrega</td><td>E2E, responsive, pulido, esta presentación</td></tr>
+    </table>
+  </section>
+
+  <!-- 7 · Sprint 1-2 highlights -->
+  <section class="slide">
+    <div class="kicker">El proceso · 3</div>
+    <h2>Sprints 1–2 · <em>los cimientos</em></h2>
+    <div class="todo">al cerrar S1: captura del ledger en acción, nº de tests, algo que salió mal y cómo se arregló. Al cerrar S2: primera captura del lounge + Figma.</div>
+  </section>
+
+  <!-- 8 · Sprint 3-4 highlights -->
+  <section class="slide">
+    <div class="kicker">El proceso · 4</div>
+    <h2>Sprints 3–4 · <em>el casino y el código</em></h2>
+    <div class="todo">al cerrar S3: demo blackjack + cómo se testeó el motor (TDD puro). Al cerrar S4: el sistema anti-trampas de las katas explicado en 30 segundos.</div>
+  </section>
+
+  <!-- 9 · Sprint 5-6 highlights -->
+  <section class="slide">
+    <div class="kicker">El proceso · 5</div>
+    <h2>Sprints 5–6 · <em>el bar cobra vida</em></h2>
+    <div class="todo">al cerrar S5: el bar antes/después (incremental visual). Al cerrar S6: conversación real con el barman + cómo se evita el prompt injection.</div>
+  </section>
+
+  <!-- 10 · Decisiones técnicas -->
+  <section class="slide">
+    <div class="kicker">Ingeniería</div>
+    <h2>Decisiones de las que <em>estoy orgulloso</em></h2>
+    <ul class="points" style="max-width:42em;">
+      <li><strong>Ledger append-only</strong> — la economía se puede auditar fila a fila, como un banco</li>
+      <li><strong>El cliente nunca es de fiar</strong> — el servidor baraja, verifica y liquida; el navegador solo mira</li>
+      <li><strong>IA sin poderes</strong> — el barman conversa, pero las tools son de solo lectura: un LLM jamás mueve fichas</li>
+      <li><strong>La última defensa está en la BD</strong> — constraints UNIQUE y CHECK, no solo Java</li>
+    </ul>
+  </section>
+
+  <!-- 11 · Calidad -->
+  <section class="slide">
+    <div class="kicker">Calidad</div>
+    <h2>Probado <em>de verdad</em></h2>
+    <ul class="points" style="max-width:40em;">
+      <li><strong>TDD</strong> — el test antes que el código, en cada pieza</li>
+      <li><strong>Cobertura</strong> — objetivo 80% backend · 70%+ frontend</li>
+      <li><strong>E2E con Playwright</strong> — los 4 flujos críticos, en CI</li>
+      <li><strong>CI en GitHub Actions</strong> — nada se mergea en rojo</li>
+    </ul>
+    <div class="todo">números finales reales: nº de tests, % de cobertura, capturas del CI en verde.</div>
+  </section>
+
+  <!-- 12 · Aprendizajes -->
+  <section class="slide">
+    <div class="kicker">Retrospectiva</div>
+    <h2>Lo que me llevo</h2>
+    <div class="todo">3 aprendizajes honestos (técnicos y de proceso) + 1 cosa que haría distinto. Se escribe la última semana, mirando atrás.</div>
+  </section>
+
+  <!-- 13 · Futuro -->
+  <section class="slide">
+    <div class="kicker">Fase 2</div>
+    <h2>El club <em>no cierra</em></h2>
+    <ul class="points" style="max-width:36em;">
+      <li>Multijugador en tiempo real</li>
+      <li>Controles táctiles para el 3D en móvil</li>
+      <li>Póker en la sala VIP</li>
+    </ul>
+  </section>
+
+  <!-- 14 · Cierre -->
+  <section class="slide">
+    <div class="frame">
+      <div class="kicker">Gracias</div>
+      <h1 style="font-size:clamp(2.2rem,5.5vw,4.5rem);">La casa <span class="marquee">invita</span></h1>
+      <div class="sig" style="margin-top:3vh;">
+        github.com/iulian640/iulianlounge-backend · iulianlounge-frontend<br>
+        <span style="opacity:.7">⏳ RELLENAR: enlace a la app desplegada</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="hud" id="dots"></div>
+<div class="counter" id="counter"></div>
+<div class="help">← → navegar · F pantalla completa</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dots = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  let current = 0;
+
+  slides.forEach(() => {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    dots.appendChild(d);
+  });
+  const dotEls = [...dots.children];
+
+  function show(i) {
+    current = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, j) => s.classList.toggle('active', j === current));
+    dotEls.forEach((d, j) => d.classList.toggle('on', j === current));
+    counter.textContent = (current + 1) + ' / ' + slides.length;
+    location.hash = current + 1;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') show(current + 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') show(current - 1);
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+    else if (e.key.toLowerCase() === 'f') {
+      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (e.clientX > window.innerWidth / 2) show(current + 1); else show(current - 1);
+  });
+
+  show(parseInt(location.hash.slice(1), 10) - 1 || 0);
+</script>
+</body>
+</html>
