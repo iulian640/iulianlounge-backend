@@ -33,8 +33,13 @@ Speakeasy elegante y oscuro, años 20-30:
 ## Cámara y control
 
 - **Tercera persona**, WASD + ratón.
-- **Escritorio primero.** Sin decisiones que bloqueen añadir controles táctiles
-  en fase 2. En móvil, de momento, pantalla de "visítalo desde tu ordenador".
+- **Escritorio primero** para la experiencia 3D. Sin decisiones que bloqueen
+  añadir controles táctiles en fase 2.
+- **Móvil: experiencia 2D completa.** Misma app y mismas features (login,
+  blackjack, terminal de retos, tienda, barman, leaderboards) servidas por los
+  mismos componentes Vue en layout responsive, sin el lounge navegable. El 3D
+  es el envoltorio de escritorio, no un requisito para jugar. (Cumple el
+  requisito del enunciado: frontend responsive Mobile y Desktop.)
 
 ## El sistema de progresión (el corazón del diseño)
 
