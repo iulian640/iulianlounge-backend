@@ -90,6 +90,84 @@ se nota en cómo te trata el barman.
 - **Muletillas:** "chaval/chavala", "la casa", "eso cuesta latones",
   "he visto peores".
 
+## Catálogo de frases de Cursaito / Dwight
+
+> Doble función: personalidad del juego + **fallback del ADR-05** (cuando el
+> LLM falle o haga timeout, estas frases responden). Se convertirán en claves
+> i18n. `{nombre}` es placeholder del username. Tono aprobado por Iulian
+> el 2026-07-03.
+
+### Saludo
+| Rango | ES | EN |
+|---|---|---|
+| Pejilgero | "Vaya. Otro pejilgero que se ha perdido." | "Huh. Another stray." |
+| Parroquiano | "Lo de siempre, chaval. Ya está servido." | "The usual, kid. Already poured." |
+| De la Casa | "{nombre}. Tu sitio está libre." | "{nombre}. Your seat's free." |
+| Socio | "Socio. La casa es suya... en parte." | "Partner. The house is yours... partially." |
+
+### Ganas al blackjack
+| Rango | ES | EN |
+|---|---|---|
+| Pejilgero | "Suerte de principiante. Se cura sola." | "Beginner's luck. It clears up on its own." |
+| Parroquiano | "No ha estado mal. He visto peores." | "Not bad. I've seen worse." |
+| De la Casa | "Así se sienta uno a esa mesa, {nombre}." | "That's how that table's meant to be played, {nombre}." |
+| Socio | "Desplumando su propio casino. Muy propio de un socio." | "Fleecing your own casino. Very fitting, partner." |
+
+### Pierdes al blackjack
+| Rango | ES | EN |
+|---|---|---|
+| Pejilgero | "La mesa no perdona, pejilgero. Y yo tampoco fío... todavía." | "The table doesn't forgive, riffraff. And I don't lend... yet." |
+| Parroquiano | "Otra manita así y te pongo un agua, chaval." | "One more hand like that and I'm pouring you water, kid." |
+| De la Casa | "Iulian también perdía. Pero perdía mejor." | "Iulian lost too. He lost better, though." |
+| Socio | "...prefiero no comentar esto con la dirección, socio." | "...I'd rather not report this to management, partner." |
+
+### Kata resuelta
+| Rango | ES | EN |
+|---|---|---|
+| Pejilgero | "Anda. El pejilgero sabe hacer algo." | "Well. The riffraff is good for something." |
+| Parroquiano | "La trastienda te sienta bien, chaval. Cobra y no lo estropees." | "The back room suits you, kid. Collect and don't ruin it." |
+| De la Casa | "Limpio y rápido. A la casa le gusta la gente así." | "Clean and quick. The house likes that." |
+| Socio | "Un socio que además trabaja. Iulian estaría... confundido." | "A partner who actually works. Iulian would be... confused." |
+
+### Kata fallada
+| Rango | ES | EN |
+|---|---|---|
+| Pejilgero | "Eso ha dolido hasta desde aquí." | "That one hurt from here." |
+| Parroquiano | "Piénsalo con la copa. Para eso está." | "Think it over with your drink. That's what it's for." |
+| De la Casa | "Hasta los mejores tachan. Vuelve a intentarlo." | "Even the best cross things out. Try again." |
+| Socio | "No lo ha visto nadie, socio. Yo no cuento." | "Nobody saw that, partner. I don't count." |
+
+### Ruina — ofrece el préstamo
+| Rango | ES | EN |
+|---|---|---|
+| Pejilgero | "¿A cero? Va. La casa fía. La casa no olvida." | "Zero? Fine. The house lends. The house doesn't forget." |
+| Parroquiano | "¿Otra vez, chaval? ...Va. Pero esta me la apuntas donde la veas." | "Again, kid? ...Fine. But this one goes where you can see it." |
+| De la Casa | "Ni una palabra. Toma. Los de la casa no se van con los bolsillos vacíos." | "Not a word. Take it. Friends of the house don't leave with empty pockets." |
+| Socio | "¿Un socio pidiéndole al barman? ...Esto queda entre usted y yo." | "A partner borrowing from the bartender? ...This stays between us." |
+
+### Deuda pagada
+| Rango | ES | EN |
+|---|---|---|
+| Pejilgero | "Mira. Un pejilgero con palabra. Empiezas a existir." | "Look at that. Riffraff with a word. You're starting to exist." |
+| Parroquiano | "Cuentas claras, chaval. Así se vuelve a esta barra." | "Clean books, kid. That's how you keep a seat at this bar." |
+| De la Casa | "Nunca lo dudé, {nombre}. Bueno. Un poco." | "Never doubted you, {nombre}. Well. A little." |
+| Socio | "Faltaría más, socio. Faltaría más." | "But of course, partner. Of course." |
+
+### Ascenso de rango (la frase la dice al alcanzar el rango nuevo)
+| Nuevo rango | ES | EN |
+|---|---|---|
+| Parroquiano | "Deja de estorbar y siéntate, anda. Ya sé lo que bebes." | "Stop loitering and sit down. I already know your drink." |
+| De la Casa | "A partir de hoy, cuando llames a la puerta, di tu nombre. Con eso basta." | "From tonight, when you knock, just say your name. That's all it takes." |
+| Socio | "Las llaves de la VIP. Iulian dejó dicho que sabría a quién dárselas. ...No sé qué vio, pero aquí están." | "Keys to the VIP room. Iulian said I'd know who to give them to. ...No idea what he saw. Here." |
+
+## Extras para días sueltos (no plan)
+
+- **Voz de Cursaito (TTS)**: las frases del catálogo son fijas → se pueden
+  generar UNA vez con una voz de TTS buena (rasposa, de época) y guardarse
+  como audios en el frontend. Habla "de verdad" en los momentos clave sin
+  coste por uso ni latencia. Las respuestas libres del LLM quedan en texto
+  (o Web Speech API como apoyo). Candidato para día suelto del S7.
+
 ## Pendiente que sigue abierto
 
 - Dominio web (iulianlounge.???) — se decide al desplegar.
