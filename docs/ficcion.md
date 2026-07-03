@@ -32,18 +32,23 @@ Iulian dejó vacío.**
 entra por la trastienda acaba siendo el nuevo Iulian. La historia del club
 es la historia del jugador, contada por adelantado.)*
 
-## El nombre de la moneda (elegir una)
+## El nombre de la moneda — DECIDIDO (2026-07-03)
 
-| Opción | Por qué | En juego |
+| Idioma | Nombre | Referencia |
 |---|---|---|
-| **Fichas** (a secas) | Sobrio, de casino real, funciona en ES y EN (chips) | "Son 50 fichas." |
-| **Latones** | Del latón del letrero y la barra; suena a jerga interna del club, muy de época | "Eso te va a costar veinte latones, chaval." |
-| **Iulianes** | La moneda lleva el nombre del fundador; máxima coherencia con la ficción (como los "reales" o los "luises") | "Aquí nadie toca un iulián sin ganárselo." |
+| ES | **Chikilicuatres** | Rodolfo Chikilicuatre (Eurovisión 2008) |
+| EN | **Shrutebucks** | La moneda que inventa Dwight Schrute en The Office |
 
-Recomendación: **latones** — tiene sabor de época, es jerga creíble de
-speakeasy, y el barman puede jugar con ella ("latón que entra, latón que
-canta"). "Iulianes" es la alternativa con más personalidad si se prefiere
-reforzar al fundador.
+La moneda es la grieta de absurdo en la elegancia del club: el barman
+pronuncia ambos nombres con total seriedad, como si fueran divisas de
+curso legal desde 1926. Jamás explica el nombre ni admite que sea gracioso.
+
+- ES: "Son cincuenta chikilicuatres, chaval. Aquí no se regatea."
+- EN: "That'll be fifty Shrutebucks. The house doesn't haggle."
+
+Técnica (ADR-06): en BD y código la moneda es `tokens` (long, sin nombre).
+Los nombres viven solo en los diccionarios i18n del frontend y en el prompt
+del barman por idioma.
 
 ## El barman (ficha de personaje)
 
