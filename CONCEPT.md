@@ -24,12 +24,22 @@ Speakeasy elegante y oscuro, años 20-30:
 - Jazz de fondo, whisky caro, humo, gente jugando a las cartas.
 - Técnica: geometría contenida + PBR con roughness variado (madera mate, latón
   brillante, cristal) + bloom sutil. La atmósfera la hace la luz, no el polycount.
+- **El letrero "Iulian's"**: nombre del club dentro de la ficción. Cartel
+  luminoso dentro del lounge, estilo Fallout pre-bomba pero con **bombillas
+  cálidas y latón** (marquee retro-americana, tipografía de época; nada de neón
+  atómico, que casaría mal con los años 20-30) — pieza de arte destacada,
+  candidata a emissive + bloom. La marca del proyecto sigue siendo IulianLounge.
 
 ## Cámara y control
 
 - **Tercera persona**, WASD + ratón.
-- **Escritorio primero.** Sin decisiones que bloqueen añadir controles táctiles
-  en fase 2. En móvil, de momento, pantalla de "visítalo desde tu ordenador".
+- **Escritorio primero** para la experiencia 3D. Sin decisiones que bloqueen
+  añadir controles táctiles en fase 2.
+- **Móvil: experiencia 2D completa.** Misma app y mismas features (login,
+  blackjack, terminal de retos, tienda, barman, leaderboards) servidas por los
+  mismos componentes Vue en layout responsive, sin el lounge navegable. El 3D
+  es el envoltorio de escritorio, no un requisito para jugar. (Cumple el
+  requisito del enunciado: frontend responsive Mobile y Desktop.)
 
 ## El sistema de progresión (el corazón del diseño)
 
