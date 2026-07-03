@@ -42,6 +42,12 @@ valorará tanto el producto final como el proceso de desarrollo.
 | Frontend con Vue (componentes, hooks, tests de componentes, responsive) | 20 |
 | Backend con Spring (seguridad, API REST, BD externa con Docker, tests unitarios y de integración) | 25 |
 
+## Requisitos adicionales (comunicados aparte del enunciado escrito)
+
+- **Cobertura de tests mínima: 70%** (nuestro estándar interno: 80% en backend,
+  70%+ en frontend — siempre por encima del mínimo).
+- **Tests E2E (end-to-end)** de los flujos críticos de usuario.
+
 ## Consejos durante el desarrollo
 
 - Versiona tu código con Git y sube tu proyecto a GitHub
