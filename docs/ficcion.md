@@ -209,11 +209,17 @@ se nota en cómo te trata el barman.
 
 ## Extras para días sueltos (no plan)
 
-- **Voz de Cursaito (TTS)**: las frases del catálogo son fijas → se pueden
-  generar UNA vez con una voz de TTS buena (rasposa, de época) y guardarse
-  como audios en el frontend. Habla "de verdad" en los momentos clave sin
-  coste por uso ni latencia. Las respuestas libres del LLM quedan en texto
-  (o Web Speech API como apoyo). Candidato para día suelto del S7.
+- **Voz de Cursaito (TTS), plan escalonado**:
+  1. *S7 si sobra un día*: las frases del catálogo son fijas → generarlas
+     UNA vez con una voz buena (rasposa, de época) y guardarlas como audios
+     en el frontend. Coste por uso: cero.
+  2. *Fase 2 — "modo Mantella"* (referencia: mod Mantella de Skyrim): voz
+     en directo también para la conversación libre. Tubería: micro del
+     jugador → Whisper (STT) → BartenderService (sin cambios) → TTS en
+     streaming (ElevenLabs/OpenAI) → audio en el navegador. El truco de la
+     latencia es encadenar en streaming: la primera frase suena mientras el
+     LLM genera el resto. La arquitectura ya lo permite: sería un TtsClient
+     junto al LlmClient, otro puerto más.
 
 ## Pendiente que sigue abierto
 
