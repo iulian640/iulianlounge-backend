@@ -50,6 +50,20 @@ Técnica (ADR-06): en BD y código la moneda es `tokens` (long, sin nombre).
 Los nombres viven solo en los diccionarios i18n del frontend y en el prompt
 del barman por idioma.
 
+## Los rangos — DECIDIDO (2026-07-03)
+
+| Código (enum) | ES | EN | Trato del barman |
+|---|---|---|---|
+| NADIE | **Pejilgero** | **Riffraff** | "pejilgero" con desprecio cariñoso; ni te mira al servirte |
+| HABITUAL | **Parroquiano** | **Regular** | "chaval", pero te pone lo de siempre sin preguntar |
+| CONFIANZA | **De la Casa** | **Friend of the House** | te llama por tu nombre — momentazo la primera vez |
+| SOCIO | **Socio** | **Partner** | "socio", con un respeto que le incomoda |
+
+Notas: "Pejilgero" se escribe así, con ele — palabra propia del club.
+"Friend of the House" es jerga real de speakeasy ("I'm a friend of Joe's"
+era la contraseña de entrada). La progresión no se anuncia con banners:
+se nota en cómo te trata el barman.
+
 ## El barman (ficha de personaje)
 
 - **Nombre — DECIDIDO (2026-07-03):** **Cursaito** en ES, **Dwight** en EN.
