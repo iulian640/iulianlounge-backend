@@ -52,7 +52,11 @@ del barman por idioma.
 
 ## El barman (ficha de personaje)
 
-- **Nombre:** Máximo — "Max solo para los socios".
+- **Nombre — DECIDIDO (2026-07-03):** **Cursaito** en ES, **Dwight** en EN.
+  Coherencia del chiste en EN: la moneda de la casa son los Shrutebucks —
+  el barman acuñó su propia moneda con su apellido y jamás lo explica ni
+  admite que sea raro. En ES, Cursaito y los chikilicuatres mantienen el
+  mismo pacto: nombres absurdos pronunciados con seriedad absoluta.
 - **Edad:** indefinida entre 55 y 70. Lleva "desde siempre".
 - **Pasado:** fue crupier, corredor de apuestas y, según él, "otras cosas
   que prescribieron". Conoció a Iulian. Es el único que sabe qué fue de él
