@@ -1,5 +1,7 @@
 # IulianLounge — Backend
 
+![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg?branch=dev)
+
 > Un speakeasy virtual navegable en 3D con un backend serio detrás.
 > A walkable 3D virtual speakeasy with a serious backend behind it.
 
