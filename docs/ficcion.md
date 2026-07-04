@@ -223,6 +223,6 @@ se nota en cómo te trata el barman.
 
 ## Pendiente que sigue abierto
 
-- Dominio web (iulianlounge.???) — se decide al desplegar.
+- ~~Dominio web~~ → **DECIDIDO (2026-07-04): `iulianlounge.com`, comprado.**
 - Juego secundario (dados vs rasca-y-gana) — se decide en S3/S4 con los
   recortables a la vista.

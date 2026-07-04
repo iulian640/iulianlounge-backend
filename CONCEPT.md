@@ -196,8 +196,8 @@ póker.
 
 ## Pendiente (no bloquea Fase 0)
 
-- Extensión del dominio (iulianlounge.???).
-- Nombre propio de la moneda/fichas.
+- ~~Extensión del dominio~~ → **DECIDIDO (2026-07-04): `iulianlounge.com`, comprado.**
+- ~~Nombre propio de la moneda/fichas~~ → **DECIDIDO (2026-07-03): Chikilicuatres (ES) / Shrutebucks (EN), ver `docs/ficcion.md`.**
 - Elegir el juego secundario (dados vs rasca-y-gana — referencia: Scritchy Scratchy).
 - Historia de fondo del club (quién lo fundó, por qué está escondido) — se
   desarrolla junto al prompt del barman.
