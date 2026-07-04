@@ -37,4 +37,6 @@ class UserRepositoryTest {
         assertEquals("es", retrieved.getLocale());
         assertEquals(user.getCreatedAt(), retrieved.getCreatedAt());
     }
+
+    
 }
