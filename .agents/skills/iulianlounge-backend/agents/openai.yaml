@@ -1,0 +1,6 @@
+interface:
+  display_name: "Iulianlounge Backend"
+  short_description: "Repo-specific patterns and workflows for iulianlounge-backend"
+  default_prompt: "Use the iulianlounge-backend repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
