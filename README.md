@@ -3,7 +3,27 @@
 > Un speakeasy virtual navegable en 3D con un backend serio detrás.
 > A walkable 3D virtual speakeasy with a serious backend behind it.
 
-**Estado / Status:** Fase 0 completada (concepto + arquitectura + ADRs). El código llega con el Sprint 1 (esqueleto Spring Boot, IUL-14). / Phase 0 done (concept + architecture + ADRs). Code lands with Sprint 1 (Spring Boot skeleton, IUL-14).
+**Estado / Status:** Sprint 1 en curso — esqueleto Spring Boot funcionando contra PostgreSQL dockerizado. / Sprint 1 in progress — Spring Boot skeleton running against dockerized PostgreSQL.
+
+## Arranque / Getting started
+
+Requisitos / Requirements: JDK 21+, Docker Desktop.
+
+```bash
+# 1. Variable de entorno con la contraseña de la BD (una sola vez) /
+#    DB password env var (once)
+setx DB_PASSWORD tu_password        # Windows (abrir terminal nueva después / reopen terminal)
+
+# 2. Levantar PostgreSQL / Start PostgreSQL
+docker compose up -d
+
+# 3. Arrancar la app / Run the app
+./mvnw spring-boot:run
+```
+
+Verificación / Check: `http://localhost:8080/actuator/health` → `{"status":"UP"}`.
+
+Estructura / Layout: `controller` → `service` → `repository` / `domain` (capas clásicas Spring; ver [architecture.md](docs/architecture.md)). Migraciones Flyway en `src/main/resources/db/migration` (desde IUL-17).
 
 - **Frontend:** [iulianlounge-frontend](https://github.com/iulian640/iulianlounge-frontend) (Vue + Three.js)
 - **Stack backend:** Java 21 · Spring Boot · Spring Data JPA · Spring Security (JWT) · PostgreSQL (Docker) · Flyway
