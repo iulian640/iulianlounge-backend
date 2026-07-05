@@ -25,21 +25,24 @@ public class RegisterService {
 
     public void register(RegisterRequest request) {
 
+
+        String email = request.email().toLowerCase();
+
         if (userRepository.existsByUsername(request.username())) {
             throw new DuplicateUserException("El username ya está en uso");
         }
 
-        if (userRepository.existsByEmail(request.email())) {
+        if (userRepository.existsByEmail(email)) {
             throw new DuplicateUserException("El email ya está en uso");
         }
 
         User user = new User();
         user.setId(UUID.randomUUID());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setRole("USER");
+        user.setRole( "USER");
         user.setCreatedAt(Instant.now());
         user.setUsername(request.username());
-        user.setEmail(request.email());
+        user.setEmail(email);
         user.setLocale(request.locale());
         userRepository.save(user);
     }
