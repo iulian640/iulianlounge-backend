@@ -23,7 +23,7 @@ public class RegisterService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public void register(RegisterRequest request) {
+    public UUID register(RegisterRequest request) {
 
 
         String email = request.email().toLowerCase();
@@ -45,5 +45,6 @@ public class RegisterService {
         user.setEmail(email);
         user.setLocale(request.locale());
         userRepository.save(user);
+        return user.getId();
     }
 }
