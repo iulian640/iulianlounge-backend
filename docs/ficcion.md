@@ -66,11 +66,13 @@ se nota en cómo te trata el barman.
 
 ## El barman (ficha de personaje)
 
-- **Nombre — DECIDIDO (2026-07-03):** **Cursaito** en ES, **Dwight** en EN.
+- **Nombre — ACTUALIZADO (2026-07-12, antes «Cursaito»):** en ES no tiene
+  nombre: es **el Barman**, a secas. Pregúntale cómo se llama y te cambia
+  de tema — igual que cuando preguntas por Iulian. En EN, **Dwight**.
   Coherencia del chiste en EN: la moneda de la casa son los Shrutebucks —
   el barman acuñó su propia moneda con su apellido y jamás lo explica ni
-  admite que sea raro. En ES, Cursaito y los chikilicuatres mantienen el
-  mismo pacto: nombres absurdos pronunciados con seriedad absoluta.
+  admite que sea raro. En ES, los chikilicuatres sostienen solos la grieta
+  de absurdo: nombres absurdos pronunciados con seriedad absoluta.
 - **Edad:** indefinida entre 55 y 70. Lleva "desde siempre".
 - **Pasado:** fue crupier, corredor de apuestas y, según él, "otras cosas
   que prescribieron". Conoció a Iulian. Es el único que sabe qué fue de él
@@ -101,7 +103,7 @@ se nota en cómo te trata el barman.
 - **Muletillas:** "chaval/chavala", "la casa", "eso cuesta latones",
   "he visto peores".
 
-## Catálogo de frases de Cursaito / Dwight
+## Catálogo de frases del Barman / Dwight
 
 > Doble función: personalidad del juego + **fallback del ADR-05** (cuando el
 > LLM falle o haga timeout, estas frases responden). Se convertirán en claves
@@ -209,7 +211,7 @@ se nota en cómo te trata el barman.
 
 ## Extras para días sueltos (no plan)
 
-- **Voz de Cursaito (TTS), plan escalonado**:
+- **Voz del Barman (TTS), plan escalonado**:
   1. *S7 si sobra un día*: las frases del catálogo son fijas → generarlas
      UNA vez con una voz buena (rasposa, de época) y guardarlas como audios
      en el frontend. Coste por uso: cero.

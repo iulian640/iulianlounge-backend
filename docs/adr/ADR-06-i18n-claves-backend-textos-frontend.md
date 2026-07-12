@@ -25,7 +25,7 @@ y complicaría la caché.
   catálogo del barman, textos de UI) viven en los diccionarios.
 - **`User.locale` se guarda en el backend** pero solo se usa para lo que el
   backend genera por sí mismo: el idioma del system prompt del barman
-  (Cursaito responde en el idioma del usuario) y futuros emails.
+  (el barman responde en el idioma del usuario) y futuros emails.
 - Consecuencia práctica ya comprobada: renombrar la moneda o una sala es
   **una línea en un diccionario**, no una migración ni un despliegue del
   backend.
