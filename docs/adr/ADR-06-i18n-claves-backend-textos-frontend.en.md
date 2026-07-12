@@ -27,7 +27,7 @@ complicate caching.
   bartender's catalog lines, UI texts) live in the dictionaries.
 - **`User.locale` is stored in the backend** but is only used for what the
   backend generates by itself: the language of the bartender's system
-  prompt (Cursaito replies in the user's language) and future emails.
+  prompt (the barman replies in the user's language) and future emails.
 - Practical consequence already verified: renaming the currency or a room
   is **one line in a dictionary**, not a migration nor a backend deploy.
 
