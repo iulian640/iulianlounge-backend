@@ -3,8 +3,12 @@
 > Documento de diseño. Complementa a [`CONCEPT.md`](../CONCEPT.md) (concepto de producto).
 > Objetivo: arquitectura por capas clásica de Spring, sin sobreingeniería, con la
 > economía de fichas como núcleo transaccional del sistema.
+> Última revisión: 2026-07-14 (nombres de la ficción, estado de implementación,
+> índice case-insensitive de email, ADRs expandidos, contexto frontend).
 
 **Decisión transversal previa a todo**: las fichas se representan como enteros (`BIGINT` / `long`), nunca decimales ni `double`. Toda mutación de saldo pasa por un único servicio (`WalletService`) y queda registrada en un ledger append-only. Todo lo demás del sistema (blackjack, katas, tienda, incremental, préstamos) son *clientes* de ese servicio.
+
+**Estado de implementación (2026-07-14, Sprint 1):** hecho — esqueleto Spring Boot 4.1 + PostgreSQL 17 en Docker (IUL-14/15), CI con gate JaCoCo 80% de líneas (IUL-16), migraciones V1 (tabla `users`) y V2 (unicidad de email case-insensitive por índice sobre `lower(email)`), entidad `User` + `UserRepository` con tests contra el Postgres real (IUL-17). En curso — IUL-18 `POST /auth/register` (servicio con BCrypt y normalización de email a minúsculas hecha; faltan controller, handler 409 y tests MockMvc). Todo lo demás de este documento sigue siendo diseño pendiente. Flujo git: ramas feature desde `dev`; `main` solo al cierre de cada sprint.
 
 ---
 
@@ -14,9 +18,9 @@
 
 | Entidad | Campos principales | Relaciones | Justificación |
 |---|---|---|---|
-| **User** | id (UUID), username (unique), email (unique), passwordHash, role (enum USER/ADMIN), locale (enum ES/EN), createdAt, lastSeenAt | 1:1 Wallet, 1:1 UserProgress | `lastSeenAt` alimenta la presencia asíncrona sin tabla extra. Locale en servidor para emails/barman. |
-| **UserProgress** | id, user (1:1), rank (enum NADIE/HABITUAL/CONFIANZA/SOCIO), xp (long), currentStreak, bestStreak, lastActivityType (enum), lastActivityAt, prestigeCount, prestigeMultiplier (int, puntos básicos: 10500 = x1.05) | ManyToOne User | Concentra la narrativa de ascenso. Separado de User para que las lecturas de auth no arrastren datos de juego. El multiplicador de prestigio como entero (puntos básicos) evita floats en la economía. |
-| **Room** | id, code (unique: MAIN/BACKROOM/VIP), requiredRank, unlockCostTokens, nameKey | — (catálogo) | Catálogo en BD sembrado por Flyway, no hardcodeado: permite añadir salas sin desplegar. `nameKey` es clave i18n, el texto vive en el frontend. |
+| **User** | id (UUID), username (unique), email (unique **case-insensitive**: índice único sobre `lower(email)`, migración V2; el servicio normaliza a minúsculas al registrar), passwordHash, role (enum USER/ADMIN), locale (enum ES/EN), createdAt, lastSeenAt | 1:1 Wallet, 1:1 UserProgress | `lastSeenAt` alimenta la presencia asíncrona sin tabla extra. Locale en servidor para emails/barman. **Implementada (IUL-17).** |
+| **UserProgress** | id, user (1:1), rank (enum PEJILGERO/PARROQUIANO/DE_LA_CASA/SOCIO — los rangos de la ficción, ver [`ficcion.md`](ficcion.md)), xp (long), currentStreak, bestStreak, lastActivityType (enum), lastActivityAt, prestigeCount, prestigeMultiplier (int, puntos básicos: 10500 = x1.05) | ManyToOne User | Concentra la narrativa de ascenso. Separado de User para que las lecturas de auth no arrastren datos de juego. El multiplicador de prestigio como entero (puntos básicos) evita floats en la economía. |
+| **Room** | id, code (unique: SALON/BACKROOM/ETERNA — en la ficción El Salón, La Trastienda y La Eterna, ver [`ficcion.md`](ficcion.md)), requiredRank, unlockCostTokens, nameKey | — (catálogo) | Catálogo en BD sembrado por Flyway, no hardcodeado: permite añadir salas sin desplegar. `nameKey` es clave i18n, el texto vive en el frontend. Decisión 2026-07-04: el blackjack se juega EN El Salón; La Trastienda solo aloja el terminal de katas. |
 | **RoomUnlock** | id, user, room, unlockedAt | ManyToOne User, ManyToOne Room; unique(user, room) | Hecho inmutable de desbloqueo. La constraint única impide doble desbloqueo (y doble cobro). |
 
 ### 1.2 Economía (el corazón)
@@ -93,6 +97,7 @@ Sin tablas nuevas: son **vistas de lectura** sobre lo que ya existe.
 | user_progress | (xp DESC), (prestige_count DESC) | Leaderboards |
 | wallet | (balance DESC) | Leaderboard de riqueza |
 | users | (last_seen_at DESC) | Presencia |
+| users | UNIQUE (lower(email)) | Unicidad de email case-insensitive (migración V2, ya aplicada) |
 | room_unlock | UNIQUE (user_id, room_id) | Anti doble desbloqueo |
 
 ### 1.10 Diagrama ER (Mermaid)
@@ -465,6 +470,8 @@ Base: `/api/v1`. Auth = JWT Bearer salvo indicación. Paginación estándar: `?p
 
 ## 4. ADRs (resumen — cada uno se expande en `docs/adr/` al implementarse)
 
+Expandidos a fecha 2026-07-14: [ADR-04](adr/ADR-04-ledger-append-only-saldo-materializado.md), [ADR-05](adr/ADR-05-barman-llm-function-calling-lista-blanca.md), [ADR-06](adr/ADR-06-i18n-claves-backend-textos-frontend.md), [ADR-08](adr/ADR-08-jwt-stateless-con-refresh-token.md) y [ADR-09](adr/ADR-09-fichas-enteros-long-prohibido-double.md). Los cuatro restantes (01 REST, 02 anti-trampas → S4, 03 blackjack → S3, 07 incremental → S5) se expanden just-in-time al arrancar su bloque.
+
 **ADR-01 — REST puro, sin WebSocket (aceptada).** Todo el juego es por turnos o asíncrono; nada exige push del servidor. Recomendado: REST + polling puntual (presencia). Alternativas: WebSocket/STOMP (complejidad de infra, testing y despliegue injustificada sin multijugador en tiempo real) y SSE (a medio camino, tampoco necesario). Reversible: la presencia en tiempo real de fase 2 se añade como canal aparte sin tocar la API REST.
 
 **ADR-02 — Anti-trampas en katas: casos ocultos rotados con verificación de outputs en servidor (aceptada).** El cliente ejecuta la kata en un Web Worker contra casos ocultos que el servidor entrega *sin* los outputs esperados; el cliente devuelve sus outputs y el servidor compara contra los esperados que solo él conoce. Rotación de grupos de casos + rate limit (5 envíos/min) + pago único por reto hacen que el ataque por fuerza bruta de outputs sea más caro que resolver la kata. Alternativas descartadas: ejecutar JS en servidor (GraalVM/sandbox: superficie de ataque enorme para un junior), firma criptográfica de outputs en cliente (la clave estaría en el cliente: seguridad teatral). Se acepta explícitamente que un tramposo dedicado puede resolver el caso a mano: el umbral es "más esfuerzo trampear que resolver".
@@ -514,3 +521,12 @@ Base: `/api/v1`. Auth = JWT Bearer salvo indicación. Paginación estándar: `?p
 Auth → **WalletService + ledger** (con sus tests de concurrencia) → Blackjack → Retos → Tienda/avatar → Incremental → Barman → Social.
 
 La economía va segunda porque todo lo demás depende de ella, y sus tests son los que validan las decisiones de ADR-04 antes de construir encima.
+
+---
+
+## 7. Contexto frontend (referencia)
+
+El frontend vive en su propio repo (`iulianlounge-frontend`) y este documento no lo gobierna, pero dos decisiones suyas afectan al contrato:
+
+- **Renderizado**: Vue 3 + Three.js con **renderer WebGPU** (fallback automático a WebGL2 en navegadores sin soporte o contextos no seguros). El lounge 3D es solo desktop; **en móvil la experiencia es 2D completa** (mismos componentes Vue, mismas features, sin escena 3D) — decisión 2026-07-03 que cumple el requisito responsive del enunciado. Consecuencia para el backend: ningún endpoint puede asumir que el cliente tiene la escena 3D; todo lo jugable debe funcionar desde la UI 2D.
+- **i18n**: el frontend resuelve los textos con vue-i18n a partir de las claves que devuelve el backend (ADR-06). Los nombres de ficción (rangos, salas, barman) viven en [`ficcion.md`](ficcion.md) y sus catálogos de texto en el repo frontend.
