@@ -357,9 +357,19 @@ récord son los dos costes conocidos y aceptados: barrida doble y la
 carpintería en Physical), 69 programas de shader, 1.12 MB de WGSL, suite en
 verde con 144 tests.
 
-## 2026-07-16 — Arranca este devlog
+## 2026-07-16 — Arranca este devlog, y el visillo espera su OK
 
 Como el enunciado da 10 puntos a la presentación del proceso y aquí ya
 había tres días de historia sin bitácora, se reconstruyó este devlog desde
 git, Jira y las notas de sesión. A partir de ahora se alimenta al cierre de
 cada sesión.
+
+También se implementó "el visillo": una pantalla de carga para el cambio de
+calidad de gráficos. Cambiar entre el grafo nativo y el de FSR recompila el
+quad de postproceso en síncrono y congela el hilo un instante (ley 17); el
+visillo lo tapa con un velo del club y el letrero latiendo — animación de
+compositor, que sigue viva con el hilo parado. Solo baja cuando el cambio
+estrena o retira ese grafo: entre alta y media no hay nada que tapar. Los
+cambios van en cola para que dos clics rápidos se apliquen en orden. Cinco
+tests nuevos; la suite queda en 149 verdes. Como toda pieza visual, espera
+el OK en pantalla antes de mergearse (rama `wip/visillo-calidad-20260716`).
