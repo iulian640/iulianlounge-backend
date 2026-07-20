@@ -371,5 +371,6 @@ visillo lo tapa con un velo del club y el letrero latiendo — animación de
 compositor, que sigue viva con el hilo parado. Solo baja cuando el cambio
 estrena o retira ese grafo: entre alta y media no hay nada que tapar. Los
 cambios van en cola para que dos clics rápidos se apliquen en orden. Cinco
-tests nuevos; la suite queda en 149 verdes. Como toda pieza visual, espera
-el OK en pantalla antes de mergearse (rama `wip/visillo-calidad-20260716`).
+tests nuevos; la suite queda en 149 verdes. Como toda pieza visual, esperó
+el OK en pantalla antes de mergearse — llegó el 20 de julio y el visillo
+vive ya en `feature/webgpu`.
