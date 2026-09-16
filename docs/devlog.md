@@ -45,6 +45,8 @@ vale la pena documentarlo porque explica el resto del devlog:
 - 14-jul — Saga de la carga: arranque en frío de 57s a 10.9s. Nacen las leyes de rendimiento. Suite de tests al 97% de cobertura.
 - 15-jul — Saga del régimen: el banco headless mide en otro régimen de GPU que la pantalla real; tres adopciones revertidas. Leyes 18 y 19. Con el OK visual de Iulian, todo se integra en `feature/webgpu` en commits atómicos, suite en verde.
 - 16-jul — Arranca este devlog.
+- 20-jul — El visillo recibe su OK y se mergea; la calidad alta se capa a 1.4 de pixelRatio. Último día antes del parón.
+- 16-sep — Se retoma a 27 días de la entrega: susto con el Jira, inventario honesto y re-planificación a cuatro sprints con el alcance recortado.
 
 ## 2026-07-02 — El concepto antes que el código
 
@@ -374,3 +376,70 @@ cambios van en cola para que dos clics rápidos se apliquen en orden. Cinco
 tests nuevos; la suite queda en 149 verdes. Como toda pieza visual, esperó
 el OK en pantalla antes de mergearse — llegó el 20 de julio y el visillo
 vive ya en `feature/webgpu`.
+
+## 2026-09-16 — Dos meses cerrado, y el inventario honesto
+
+El club estuvo cerrado desde el 20 de julio. Esta entrada no cuenta código
+escrito: cuenta el día que se abrió la persiana, se miró lo que había dentro y
+se rehízo el plan con lo que quedaba de calendario. Faltan 27 días para la
+entrega del 13 de octubre.
+
+Empezó con un susto. El Jira parecía borrado: se entraba y respondía "No tienes
+acceso a ningún proyecto ni actividad", que es exactamente lo que se ve cuando
+un proyecto ya no existe. No existía nada de eso. El proyecto `IUL` seguía
+entero, con sus 53 tareas y sus 14 épicas. Lo que pasa es que vive en
+`iuliantim.atlassian.net` y el navegador tenía abierta la sesión del site del
+bootcamp, que es otro distinto. Jira distingue mal entre "no tienes permiso" y
+"no has iniciado sesión aquí", y con el aviso equivocado delante se pasa un mal
+rato. Un clic en el botón de entrar y el tablero apareció completo. Lección
+anotada para el manual de la casa: ante un "no hay nada", comprobar la sesión
+antes de dar nada por perdido.
+
+Después, el inventario, que fue menos agradable que el susto. Puestos el
+enunciado y el repositorio uno al lado del otro, el reparto es feo. Lo que está
+terminado y bien es la documentación: este devlog, cinco ADRs en dos idiomas,
+la arquitectura con su modelo de datos, las leyes de rendimiento, los READMEs,
+el deck. Lo que está sin hacer es el código que puntúa. El backend tiene
+entidad `User`, repositorio, dos migraciones y una CI en verde, y **cero
+endpoints REST**: el registro sigue a medias en su rama, sin controller. El
+frontend es un club precioso y vacío: una vista, una ruta, y el `counter.js` de
+la plantilla de Vue todavía ahí. Sus 96 commits de lounge ni siquiera están en
+`main`. Sumados, los criterios de Vue y de Spring son 45 de los 100 puntos.
+
+Duele reconocerlo porque el trabajo de julio fue bueno; el problema es que todo
+él cayó del mismo lado del tablero. Las sagas de las sombras, de la carga y del
+régimen enseñaron muchísimo y no aparecen en ninguna casilla de la rúbrica.
+
+El tablero, además, mentía por omisión: congelado el 4 de julio, con IUL-27
+(blockout del lounge) todavía en "por hacer" cuando ese trabajo está hecho y muy
+superado. Quien lo abriera hoy vería un proyecto que cerró cuatro tareas y
+murió, justo lo contrario de lo que cuenta esta bitácora. Y la gestión del Jira
+son 10 puntos.
+
+De ahí salió el plan de la recta final, con tres decisiones tomadas en frío:
+
+- **Alcance recortado a lo que se defiende**: el mínimo del enunciado (auth
+  completa, cartera con su ledger, HUD en Vue, versión móvil, E2E, cobertura),
+  el lounge 3D como envoltorio de lo que ya existe, y el barman con LLM como
+  única pieza de juego. Fuera blackjack, katas, tienda, incremental y social.
+  Sus épicas no se borran: se marcan como fuera del PMV, que es más honesto y
+  se explica mejor en la presentación.
+- **Cuatro sprints de una semana** en lugar de los siete de dos que se
+  planificaron en julio: la puerta del club (auth), la cartera (economía y HUD),
+  el barman (LLM y E2E) y la entrega. El último no lleva ni una línea de
+  funcionalidad nueva.
+- **Reparto mixto del código**, que cambia la regla que regía hasta ahora.
+  Iulian sigue escribiendo en modo enseñanza el núcleo que va a tener que
+  defender de pie —autenticación, JWT, la cartera con su ledger, un test de cada
+  tipo—, y el relleno (DTOs, configuración, los E2E, el 3D) pasa a Claude. Con
+  tres o cuatro horas al día no cabe aprenderlo todo escribiéndolo todo, y era
+  mejor elegir qué se aprende que descubrir el día 10 que no llega.
+
+El riesgo está identificado y escrito para que no se olvide: el 3D es lo
+divertido y lo único que ya funciona, así que tira. La regla para estas cuatro
+semanas es que el backlog de pulido del lounge no se toca hasta que el sprint en
+curso esté cerrado.
+
+Queda una diapositiva nueva para la presentación, y no es la que menos vale: un
+proyecto que se para dos meses y se replanifica con los números delante cuenta
+más del oficio que un cronograma que finge haberse cumplido.
