@@ -8,7 +8,7 @@ Accepted — 2026-07-03
 
 ## Context
 
-The bartender (Cursaito/Dwight) is a conversational NPC who must know the
+The bartender (unnamed in ES; Dwight in EN) is a conversational NPC who must know the
 player's real data (balance, streak, debts, progress) so that his replies —
 and his jabs — are personalized. That requires an LLM with access to backend
 data, which raises three problems:

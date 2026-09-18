@@ -4,8 +4,12 @@
 > Design document. Complements [`CONCEPT.en.md`](../CONCEPT.en.md) (product concept).
 > Goal: classic layered Spring architecture, no overengineering, with the
 > token economy as the transactional core of the system.
+> Last revised: 2026-07-14 (fiction names, implementation status,
+> case-insensitive email index, expanded ADRs, frontend context).
 
 **Cross-cutting decision before everything else**: tokens are represented as integers (`BIGINT` / `long`), never decimals or `double`. Every balance mutation goes through a single service (`WalletService`) and is recorded in an append-only ledger. Everything else in the system (blackjack, katas, shop, incremental, loans) are *clients* of that service.
+
+**Implementation status (2026-07-14, Sprint 1):** done — Spring Boot 4.1 skeleton + PostgreSQL 17 in Docker (IUL-14/15), CI with a JaCoCo 80% line-coverage gate (IUL-16), migrations V1 (`users` table) and V2 (case-insensitive email uniqueness via an index on `lower(email)`), `User` entity + `UserRepository` with tests against the real Postgres (IUL-17). In progress — IUL-18 `POST /auth/register` (service with BCrypt and email lowercasing done; controller, 409 handler and MockMvc tests pending). Everything else in this document is still pending design. Git flow: feature branches from `dev`; `main` only at each sprint close.
 
 ---
 
@@ -15,9 +19,9 @@
 
 | Entity | Main fields | Relationships | Rationale |
 |---|---|---|---|
-| **User** | id (UUID), username (unique), email (unique), passwordHash, role (enum USER/ADMIN), locale (enum ES/EN), createdAt, lastSeenAt | 1:1 Wallet, 1:1 UserProgress | `lastSeenAt` feeds async presence without an extra table. Locale on the server for emails/bartender. |
-| **UserProgress** | id, user (1:1), rank (enum NADIE/HABITUAL/CONFIANZA/SOCIO), xp (long), currentStreak, bestStreak, lastActivityType (enum), lastActivityAt, prestigeCount, prestigeMultiplier (int, basis points: 10500 = x1.05) | ManyToOne User | Concentrates the rise narrative. Separate from User so auth reads do not drag game data along. The prestige multiplier as an integer (basis points) avoids floats in the economy. |
-| **Room** | id, code (unique: MAIN/BACKROOM/VIP), requiredRank, unlockCostTokens, nameKey | — (catalog) | Catalog in the DB seeded by Flyway, not hardcoded: rooms can be added without deploying. `nameKey` is an i18n key; the text lives in the frontend. |
+| **User** | id (UUID), username (unique), email (unique **case-insensitive**: unique index on `lower(email)`, migration V2; the service lowercases on registration), passwordHash, role (enum USER/ADMIN), locale (enum ES/EN), createdAt, lastSeenAt | 1:1 Wallet, 1:1 UserProgress | `lastSeenAt` feeds async presence without an extra table. Locale on the server for emails/bartender. **Implemented (IUL-17).** |
+| **UserProgress** | id, user (1:1), rank (enum PEJILGERO/PARROQUIANO/DE_LA_CASA/SOCIO — the fiction's ranks Riffraff/Regular/Friend of the House/Partner, see [`ficcion.en.md`](ficcion.en.md)), xp (long), currentStreak, bestStreak, lastActivityType (enum), lastActivityAt, prestigeCount, prestigeMultiplier (int, basis points: 10500 = x1.05) | ManyToOne User | Concentrates the rise narrative. Separate from User so auth reads do not drag game data along. The prestige multiplier as an integer (basis points) avoids floats in the economy. |
+| **Room** | id, code (unique: SALON/BACKROOM/ETERNA — in the fiction The Parlor, The Back Room and The Long Game, see [`ficcion.en.md`](ficcion.en.md)), requiredRank, unlockCostTokens, nameKey | — (catalog) | Catalog in the DB seeded by Flyway, not hardcoded: rooms can be added without deploying. `nameKey` is an i18n key; the text lives in the frontend. Decision 2026-07-04: blackjack is played IN The Parlor; The Back Room only hosts the kata terminal. |
 | **RoomUnlock** | id, user, room, unlockedAt | ManyToOne User, ManyToOne Room; unique(user, room) | Immutable unlock fact. The unique constraint prevents double unlocking (and double charging). |
 
 ### 1.2 Economy (the heart)
@@ -94,6 +98,7 @@ No new tables: they are **read views** over what already exists.
 | user_progress | (xp DESC), (prestige_count DESC) | Leaderboards |
 | wallet | (balance DESC) | Wealth leaderboard |
 | users | (last_seen_at DESC) | Presence |
+| users | UNIQUE (lower(email)) | Case-insensitive email uniqueness (migration V2, already applied) |
 | room_unlock | UNIQUE (user_id, room_id) | Anti double unlock |
 
 ### 1.10 ER diagram (Mermaid)
@@ -466,6 +471,8 @@ Base: `/api/v1`. Auth = JWT Bearer unless stated. Standard pagination: `?page=&s
 
 ## 4. ADRs (summary — each is expanded in `docs/adr/` as it gets implemented)
 
+Expanded as of 2026-07-14: [ADR-04](adr/ADR-04-ledger-append-only-saldo-materializado.en.md), [ADR-05](adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md), [ADR-06](adr/ADR-06-i18n-claves-backend-textos-frontend.en.md), [ADR-08](adr/ADR-08-jwt-stateless-con-refresh-token.en.md) and [ADR-09](adr/ADR-09-fichas-enteros-long-prohibido-double.en.md). The remaining four (01 REST, 02 anti-cheat → S4, 03 blackjack → S3, 07 incremental → S5) get expanded just-in-time when their block starts.
+
 **ADR-01 — Pure REST, no WebSocket (accepted).** The whole game is turn-based or asynchronous; nothing requires server push. Recommended: REST + occasional polling (presence). Alternatives: WebSocket/STOMP (infra, testing and deployment complexity unjustified without real-time multiplayer) and SSE (halfway house, not needed either). Reversible: phase 2 real-time presence is added as a separate channel without touching the REST API.
 
 **ADR-02 — Kata anti-cheat: rotated hidden cases with server-side output verification (accepted).** The client runs the kata in a Web Worker against hidden cases the server hands out *without* the expected outputs; the client returns its outputs and the server compares them against the expected ones only it knows. Rotating case groups + rate limit (5 submissions/min) + single payment per challenge make brute-forcing outputs more expensive than solving the kata. Rejected alternatives: running JS on the server (GraalVM/sandbox: a huge attack surface for a junior), cryptographic signing of outputs on the client (the key would live in the client: security theater). It is explicitly accepted that a dedicated cheater can solve a case by hand: the bar is "cheating costs more effort than solving".
@@ -515,3 +522,12 @@ Base: `/api/v1`. Auth = JWT Bearer unless stated. Standard pagination: `?page=&s
 Auth → **WalletService + ledger** (with its concurrency tests) → Blackjack → Challenges → Shop/avatar → Incremental → Bartender → Social.
 
 The economy goes second because everything else depends on it, and its tests are the ones that validate the ADR-04 decisions before building on top.
+
+---
+
+## 7. Frontend context (reference)
+
+The frontend lives in its own repo (`iulianlounge-frontend`) and this document does not govern it, but two of its decisions affect the contract:
+
+- **Rendering**: Vue 3 + Three.js with the **WebGPU renderer** (automatic WebGL2 fallback on browsers without support or non-secure contexts). The 3D lounge is desktop-only; **on mobile the experience is fully 2D** (same Vue components, same features, no 3D scene) — a 2026-07-03 decision that satisfies the brief's responsive requirement. Consequence for the backend: no endpoint may assume the client has the 3D scene; everything playable must work from the 2D UI.
+- **i18n**: the frontend resolves texts with vue-i18n from the keys the backend returns (ADR-06). The fiction names (ranks, rooms, bartender) live in [`ficcion.en.md`](ficcion.en.md) and their text catalogs in the frontend repo.

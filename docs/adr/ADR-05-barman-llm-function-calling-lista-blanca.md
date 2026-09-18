@@ -6,7 +6,7 @@ Aceptada — 2026-07-03
 
 ## Contexto
 
-El barman (Cursaito/Dwight) es un NPC conversacional que debe conocer los
+El barman (sin nombre en ES; Dwight en EN) es un NPC conversacional que debe conocer los
 datos reales del jugador (saldo, racha, deudas, progreso) para que sus
 respuestas — y sus faltadas — sean personalizadas. Eso exige un LLM con
 acceso a datos del backend, lo que plantea tres problemas:
