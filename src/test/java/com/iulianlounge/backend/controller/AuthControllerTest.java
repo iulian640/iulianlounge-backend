@@ -1,6 +1,8 @@
 package com.iulianlounge.backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -64,5 +66,21 @@ class AuthControllerTest {
                         .content(body))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("El email ya está en uso"));
+    }
+
+    @Test
+    void registerReturns400WhenBodyIsInvalid() throws Exception {
+        // Arrange: email sin @ y contraseña de menos de 8 caracteres
+        String body = """
+                {"username":"cursaito","email":"no-es-un-email","password":"123","locale":"es"}
+                """;
+
+        // Act + Assert: @Valid lo corta antes de llegar al service
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+
+        verify(registerService, never()).register(any());
     }
 }
