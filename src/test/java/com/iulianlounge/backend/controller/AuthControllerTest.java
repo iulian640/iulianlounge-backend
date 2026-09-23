@@ -114,6 +114,13 @@ class AuthControllerTest {
         expectBadRequest(bodyWith("<script>", "cursaito@lounge.com", "12345678", "es"));
     }
 
+    @Test
+    void registerReturns400WhenPasswordIsTooLong() throws Exception {
+        String longPassword = "p".repeat(65);   // BCrypt no admite más de 72 bytes
+
+        expectBadRequest(bodyWith("cursaito", "cursaito@lounge.com", longPassword, "es"));
+    }
+
     private String bodyWith(String username, String email, String password, String locale) {
         return """
                 {"username":"%s","email":"%s","password":"%s","locale":"%s"}
