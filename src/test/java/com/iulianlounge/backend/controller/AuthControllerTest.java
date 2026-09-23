@@ -130,6 +130,13 @@ class AuthControllerTest {
     }
 
     @Test
+    void registerReturns400WhenPasswordExceedsBcrypt72Bytes() throws Exception {
+        String multibyte = "ñ".repeat(40);   // 40 caracteres pasan @Size, pero son 80 bytes
+
+        expectBadRequest(bodyWith("cursaito", "cursaito@lounge.com", multibyte, "es"));
+    }
+
+    @Test
     void registerReturns400WhenLocaleIsNotSupported() throws Exception {
         expectBadRequest(bodyWith("cursaito", "cursaito@lounge.com", "12345678", "fr"));
     }
