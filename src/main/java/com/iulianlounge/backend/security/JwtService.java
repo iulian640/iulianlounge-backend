@@ -31,6 +31,8 @@ public class JwtService {
     private static final String TYPE_CLAIM = "type";
     private static final String ACCESS_TYPE = "access";
     private static final String REFRESH_TYPE = "refresh";
+    // Un único mensaje para todo token rechazado: no revela si la firma era buena
+    private static final String INVALID_TOKEN = "Token inválido o caducado";
 
     private final SecretKey key;
     private final Clock clock;
@@ -94,10 +96,10 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (JwtException | IllegalArgumentException ex) {
-            throw new InvalidTokenException("Token inválido o caducado");
+            throw new InvalidTokenException(INVALID_TOKEN);
         }
         if (!expectedType.equals(claims.get(TYPE_CLAIM, String.class))) {
-            throw new InvalidTokenException("Tipo de token incorrecto");
+            throw new InvalidTokenException(INVALID_TOKEN);
         }
         return claims;
     }

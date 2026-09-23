@@ -74,6 +74,18 @@ class JwtServiceTest {
     }
 
     @Test
+    void wrongTypeGivesTheSameMessageAsAnyInvalidToken() {
+        String refresh = jwtService.generateRefreshToken(user);
+
+        InvalidTokenException wrongType = assertThrows(InvalidTokenException.class,
+                () -> jwtService.validateAccessToken(refresh));
+        InvalidTokenException garbage = assertThrows(InvalidTokenException.class,
+                () -> jwtService.validateAccessToken("no-soy-un-jwt"));
+
+        assertEquals(garbage.getMessage(), wrongType.getMessage());
+    }
+
+    @Test
     void accessTokenIsNotAcceptedAsRefreshToken() {
         String access = jwtService.generateAccessToken(user);
 
