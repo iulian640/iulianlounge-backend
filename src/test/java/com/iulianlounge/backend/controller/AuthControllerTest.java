@@ -25,6 +25,7 @@ import com.iulianlounge.backend.dto.RefreshResponse;
 import com.iulianlounge.backend.exception.DuplicateUserException;
 import com.iulianlounge.backend.exception.InvalidCredentialsException;
 import com.iulianlounge.backend.exception.InvalidTokenException;
+import com.iulianlounge.backend.security.JwtService;
 import com.iulianlounge.backend.service.AuthService;
 import com.iulianlounge.backend.service.RegisterService;
 
@@ -40,6 +41,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private JwtService jwtService;   // SecurityConfig lo necesita para montar el filtro
 
     @Test
     void registerReturns201WithUserId() throws Exception {
@@ -235,6 +239,14 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(authService, never()).refresh(any());
+    }
+
+    @Test
+    void unknownAuthRouteIsPrivateNotPublic() throws Exception {
+        // Antes /api/v1/auth/** era todo público; ahora solo register, login y refresh
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Autenticación requerida"));
     }
 
     private String bodyWith(String username, String email, String password, String locale) {
