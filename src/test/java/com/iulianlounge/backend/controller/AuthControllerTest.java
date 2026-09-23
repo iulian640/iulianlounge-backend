@@ -126,6 +126,13 @@ class AuthControllerTest {
         expectBadRequest(bodyWith("cursaito", "cursaito@lounge.com", "12345678", "fr"));
     }
 
+    @Test
+    void registerReturns400WhenEmailIsTooLong() throws Exception {
+        String longEmail = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(63) + ".com";
+
+        expectBadRequest(bodyWith("cursaito", longEmail, "12345678", "es"));
+    }
+
     private String bodyWith(String username, String email, String password, String locale) {
         return """
                 {"username":"%s","email":"%s","password":"%s","locale":"%s"}
