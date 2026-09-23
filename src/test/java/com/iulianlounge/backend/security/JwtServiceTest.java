@@ -180,6 +180,31 @@ class JwtServiceTest {
     }
 
     @Test
+    void accessTokenWithMissingOrUnknownRoleIsRejected() {
+        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String noRole = Jwts.builder()
+                .issuer(JwtService.ISSUER)
+                .audience().add(JwtService.AUDIENCE).and()
+                .subject(user.getId().toString())
+                .claim("type", "access")
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+        String unknownRole = Jwts.builder()
+                .issuer(JwtService.ISSUER)
+                .audience().add(JwtService.AUDIENCE).and()
+                .subject(user.getId().toString())
+                .claim("role", "SUPERJEFE")
+                .claim("type", "access")
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+
+        assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken(noRole));
+        assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken(unknownRole));
+    }
+
+    @Test
     void garbageTokenIsRejected() {
         assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken("no-soy-un-jwt"));
     }

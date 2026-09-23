@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -35,6 +36,8 @@ public class JwtService {
     // Si JWT_SECRET se reutilizara en otro entorno o servicio, sus tokens no valdrían aquí
     static final String ISSUER = "iulianlounge";
     static final String AUDIENCE = "iulianlounge-api";
+    // Roles que el filtro puede convertir en ROLE_*: cualquier otro (o ninguno) invalida el token
+    private static final Set<String> ALLOWED_ROLES = Set.of("USER", "ADMIN");
     // Un único mensaje para todo token rechazado: no revela si la firma era buena
     private static final String INVALID_TOKEN = "Token inválido o caducado";
 
@@ -88,10 +91,16 @@ public class JwtService {
 
     public AccessTokenClaims validateAccessToken(String token) {
         Claims claims = parse(token, ACCESS_TYPE);
-        return readOrReject(() -> new AccessTokenClaims(
-                UUID.fromString(claims.getSubject()),
-                claims.get("username", String.class),
-                claims.get("role", String.class)));
+        return readOrReject(() -> {
+            String role = claims.get("role", String.class);
+            if (!ALLOWED_ROLES.contains(role)) {
+                throw new IllegalArgumentException("Rol desconocido");
+            }
+            return new AccessTokenClaims(
+                    UUID.fromString(claims.getSubject()),
+                    claims.get("username", String.class),
+                    role);
+        });
     }
 
     public RefreshTokenClaims validateRefreshToken(String token) {
