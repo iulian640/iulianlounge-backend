@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +27,7 @@ import com.iulianlounge.backend.exception.InvalidCredentialsException;
 import com.iulianlounge.backend.exception.InvalidTokenException;
 import com.iulianlounge.backend.repository.UserRepository;
 import com.iulianlounge.backend.security.JwtService;
+import com.iulianlounge.backend.security.RefreshTokenClaims;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -86,10 +88,13 @@ class AuthServiceTest {
 
     @Test
     void refreshReturnsNewTokenPairForValidRefreshToken() {
-        when(jwtService.validateRefreshToken("refresh-valido")).thenReturn(user.getId());
+        Instant loginExpiry = Instant.parse("2026-09-30T12:00:00Z");
+        when(jwtService.validateRefreshToken("refresh-valido"))
+                .thenReturn(new RefreshTokenClaims(user.getId(), loginExpiry));
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(jwtService.generateAccessToken(user)).thenReturn("access-nuevo");
-        when(jwtService.generateRefreshToken(user)).thenReturn("refresh-nuevo");
+        // El refresh nuevo se pide con la caducidad del original, no con 7 días nuevos
+        when(jwtService.generateRefreshToken(user, loginExpiry)).thenReturn("refresh-nuevo");
 
         RefreshResponse response = authService.refresh(new RefreshRequest("refresh-valido"));
 
@@ -109,7 +114,8 @@ class AuthServiceTest {
 
     @Test
     void refreshThrowsWhenUserNoLongerExists() {
-        when(jwtService.validateRefreshToken("refresh-de-cuenta-borrada")).thenReturn(user.getId());
+        when(jwtService.validateRefreshToken("refresh-de-cuenta-borrada"))
+                .thenReturn(new RefreshTokenClaims(user.getId(), Instant.parse("2026-09-30T12:00:00Z")));
         when(userRepository.findById(user.getId())).thenReturn(Optional.empty());
 
         assertThrows(InvalidTokenException.class,

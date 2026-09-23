@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Date;
@@ -54,7 +55,22 @@ class JwtServiceTest {
     void refreshTokenCarriesUserId() {
         String token = jwtService.generateRefreshToken(user);
 
-        assertEquals(user.getId(), jwtService.validateRefreshToken(token));
+        assertEquals(user.getId(), jwtService.validateRefreshToken(token).userId());
+    }
+
+    @Test
+    void rotatedRefreshTokenKeepsTheOriginalExpiry() {
+        String fromLogin = jwtService.generateRefreshToken(user);
+
+        // Día 6: se rota el refresh
+        JwtService daySix = new JwtService(SECRET, Clock.fixed(NOW.plus(Duration.ofDays(6)), ZoneOffset.UTC));
+        RefreshTokenClaims claims = daySix.validateRefreshToken(fromLogin);
+        String rotated = daySix.generateRefreshToken(user, claims.expiresAt());
+
+        // Día 7 + 1 minuto: el rotado ya no vale, la sesión no se ha alargado
+        JwtService afterSevenDays = new JwtService(SECRET,
+                Clock.fixed(NOW.plus(JwtService.REFRESH_TTL).plusSeconds(60), ZoneOffset.UTC));
+        assertThrows(InvalidTokenException.class, () -> afterSevenDays.validateRefreshToken(rotated));
     }
 
     @Test

@@ -69,6 +69,11 @@ public class JwtService {
     }
 
     public String generateRefreshToken(User user) {
+        return generateRefreshToken(user, clock.instant().plus(REFRESH_TTL));
+    }
+
+    // Rotación: el refresh nuevo hereda la caducidad del anterior, así la sesión muere a los 7 días del login
+    public String generateRefreshToken(User user, Instant expiresAt) {
         Instant now = clock.instant();
         return Jwts.builder()
                 .issuer(ISSUER)
@@ -76,7 +81,7 @@ public class JwtService {
                 .subject(user.getId().toString())
                 .claim(TYPE_CLAIM, REFRESH_TYPE)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(REFRESH_TTL)))
+                .expiration(Date.from(expiresAt))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
@@ -89,9 +94,11 @@ public class JwtService {
                 claims.get("role", String.class)));
     }
 
-    public UUID validateRefreshToken(String token) {
+    public RefreshTokenClaims validateRefreshToken(String token) {
         Claims claims = parse(token, REFRESH_TYPE);
-        return readOrReject(() -> UUID.fromString(claims.getSubject()));
+        return readOrReject(() -> new RefreshTokenClaims(
+                UUID.fromString(claims.getSubject()),
+                claims.getExpiration().toInstant()));
     }
 
     // Firma buena pero claims rotos (sub ausente o no-UUID): 401, no 500
