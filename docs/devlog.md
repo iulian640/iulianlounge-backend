@@ -47,6 +47,7 @@ vale la pena documentarlo porque explica el resto del devlog:
 - 16-jul — Arranca este devlog.
 - 20-jul — El visillo recibe su OK y se mergea; la calidad alta se capa a 1.4 de pixelRatio. Último día antes del parón.
 - 16-sep — Se retoma a 27 días de la entrega: susto con el Jira, inventario honesto y re-planificación a cuatro sprints con el alcance recortado.
+- 23-sep — Autenticación completa en el backend (IUL-18..21): registro, login, refresh, filtro JWT y `/me`. Tres rondas de revisión, y los ADR-06 y ADR-08 enmendados.
 
 ## 2026-07-02 — El concepto antes que el código
 
@@ -443,3 +444,60 @@ curso esté cerrado.
 Queda una diapositiva nueva para la presentación, y no es la que menos vale: un
 proyecto que se para dos meses y se replanifica con los números delante cuenta
 más del oficio que un cronograma que finge haberse cumplido.
+
+## 2026-09-23 — La puerta del club, cerrada con llave
+
+El día empezó con el registro a medias y cinco días de retraso sobre el plan
+del 16. Terminó con la autenticación entera en el backend: registro, login,
+refresh, un filtro que protege las rutas y un `GET /me` para comprobarlo. Son
+62 tests, con el 98 % de las líneas cubiertas, y los cuatro tickets del sprint
+(IUL-18 a IUL-21) en Done.
+
+El camino no fue el previsto. Iulian escribió `RegisterResponse` en modo
+enseñanza y ahí se atascó: el constructor que inyecta el service en el
+controller le pareció "demasiado complicado para mis conocimientos". Lo
+curioso es que ya lo había escrito él mismo en `RegisterService`. Lo que
+intimida no es Java, es la parte de Spring que ocurre sin que se vea. Con tres
+opciones delante eligió que Claude escribiera la fontanería de Spring y se la
+explicara línea a línea. Más tarde, con los tests del controller, pidió lo
+mismo para todo lo que quedaba del sprint. El reparto del 16 decía que
+`JwtService` y `AuthService` los escribiría él, porque son lo que tiene que
+defender; al final los escribió Claude y él los estudió pieza a pieza, con
+preguntas de comprobación. Aprender a leer código ajeno y saber explicarlo
+también es oficio, pero queda anotado que el plan cambió.
+
+Cada ticket pasó por dos revisores automáticos, uno de Java y otro de
+seguridad, y cada ronda encontró algo que la anterior había dejado pasar:
+
+- **Un refresh eterno**: cada vez que se renovaba la sesión nacía un refresh
+  con siete días nuevos, así que un token robado podía alargarse para siempre.
+  Ahora el token renovado hereda la caducidad del original, y ninguna sesión
+  pasa de siete días desde el login.
+- **Un algoritmo que dependía de la clave**: jjwt elige HS256, HS384 o HS512
+  según la longitud del secreto, y el de producción habría firmado en HS512
+  sin avisar. Quedó fijado en HS256, como dice el ADR.
+- **Un 500 escondido en el registro**: BCrypt no admite contraseñas de más
+  de 72 bytes, y `@Size` cuenta caracteres, no bytes. Una contraseña de 40
+  eñes pasaba la validación y reventaba al cifrarla.
+- **Una carrera**: dos registros idénticos a la vez superaban los dos la
+  comprobación de duplicados, y el segundo acababa en un 500 disfrazado de 403.
+
+Al final se pasó una revisión de todo el backend junto, no ticket a ticket.
+El veredicto fue que el código de la API está sólido y que lo peligroso está
+alrededor: la compose publica Postgres en todas las interfaces (Docker se
+salta el firewall del servidor) y la app entra a la base de datos como
+superusuario. Las dos cosas se arreglan antes del despliegue del fin de semana.
+
+Esa revisión también sacó una contradicción con la documentación. El ADR-06
+dice que el backend devuelve claves y nunca texto, y los errores salían como
+frases en castellano. Se revisaron los dos ADRs afectados y se enmendaron con
+decisiones de Iulian. En el ADR-08, el refresh pasa a una cookie `HttpOnly`,
+porque en una escena 3D con tanto JavaScript un XSS no se puede descartar, y
+lo que el JavaScript no puede leer tampoco se lo lleva un XSS. En el ADR-06,
+cada error lleva un `code` estable que traduce el frontend, todos los códigos
+viven en un solo enum y queda escrita la única excepción: el texto que genera
+el LLM del barman, que no puede ser una clave.
+
+Ninguna de las dos enmiendas está en el código todavía. Van primero en la
+próxima sesión, antes de que el frontend empiece a consumir el login, porque
+cambiar el contrato con un solo lado escrito es barato y con los dos es caro.
