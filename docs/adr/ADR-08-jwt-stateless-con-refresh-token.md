@@ -2,7 +2,8 @@
 
 ## Estado
 
-Aceptada — 2026-07-03
+Aceptada — 2026-07-03. Enmendada el 2026-09-23 (ver Historial). La cookie
+del refresh está pendiente de implementar, antes de IUL-29.
 
 ## Contexto
 
@@ -22,33 +23,65 @@ Hay dos tensiones:
    usuario a re-loguearse constantemente (inaceptable en mitad de una mano
    de blackjack).
 
-Además, frontend y backend viven en repos y dominios distintos, lo que
-complica las cookies de sesión cross-site.
+Frontend y backend se despliegan en el mismo origen: Caddy sirve el frontend
+en `iulianlounge.com` y reenvía `/api` al backend. Las cookies del propio
+sitio funcionan sin los problemas del cross-site.
+
+El frontend es una escena 3D con mucho JavaScript propio y de terceros, así
+que un XSS no se puede descartar. Lo que el JavaScript de la página pueda
+leer, un XSS también lo puede leer.
 
 ## Decisión
 
 **JWT firmados por el backend, sin estado en servidor, con dos tokens:**
 
 - **Access token (15 min)**: viaja en la cabecera `Authorization` de cada
-  petición autenticada. Contiene identidad y rol, firmado con la clave
-  secreta del servidor: alterar su contenido invalida la firma.
-- **Refresh token (7 días)**: solo sirve para pedir un access token nuevo
-  en `POST /auth/refresh`. Mínima exposición: solo viaja a ese endpoint.
+  petición autenticada. Lleva el id del usuario, su rol y el tipo de token.
+  El frontend lo guarda solo en memoria.
+- **Refresh token (7 días)**: viaja en una cookie
+  `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`. El JavaScript no
+  puede leerla, así que un XSS puede usar el access mientras la página siga
+  abierta, pero no llevarse la sesión.
 
-Flujo: cuando el access caduca, el backend responde 401, el frontend llama
-a `/auth/refresh` en silencio, obtiene un access nuevo y reintenta. El
-usuario solo re-loguea tras 7 días de inactividad.
+Flujo: el login devuelve el access en el cuerpo y pone la cookie. Cuando el
+access caduca, el backend responde 401, el frontend llama a
+`POST /auth/refresh` (el navegador adjunta la cookie), recibe un access nuevo
+y reintenta. `POST /auth/logout` borra la cookie.
 
-La clave de firma vive en **variable de entorno**, jamás en el repo (que es
-público). Si se filtrase, permitiría fabricar tokens de cualquier usuario
-con cualquier rol: rotación inmediata (invalida todos los tokens emitidos).
+Tope de sesión: 7 días desde el login. Cada refresh emite un refresh nuevo
+que hereda la caducidad del anterior, así que jugar a diario no alarga la
+sesión: el día 8 hay que volver a entrar.
+
+Detalles de implementación que endurecen la decisión (IUL-19, IUL-20 e
+IUL-21):
+
+- Firma HS256 fijada en el código. No depende de la longitud de la clave.
+- Claims `iss` y `aud` propios: un token firmado con la misma clave por otro
+  servicio o entorno no vale aquí.
+- Claim `type`: un refresh no sirve como access ni al revés.
+- Solo los roles de una lista cerrada se convierten en `ROLE_*`.
+- Todos los tokens rechazados reciben el mismo mensaje, que no revela el
+  motivo.
+
+La clave de firma vive en la variable de entorno `JWT_SECRET` (32 bytes o
+más), jamás en el repo, que es público. Si se filtrase permitiría fabricar
+tokens de cualquier usuario con cualquier rol: rotación inmediata, que
+invalida todos los tokens emitidos.
+
+CSRF sigue desactivado. La cookie solo acompaña a peticiones del propio sitio
+(`SameSite=Strict`) y solo a las rutas de `/api/v1/auth`. El resto de rutas
+se autentican con la cabecera `Authorization`, que un formulario de otra web
+no puede poner.
 
 ## Alternativas consideradas
 
-- **Sesiones de servidor (cookie + estado en BD).** Descartada: consulta de
-  sesión en cada petición, requiere estado compartido, protección CSRF, y
-  pelea con cookies cross-site al tener frontend y backend en dominios
-  distintos.
+- **Refresh token en el cuerpo JSON, guardado por el frontend.** Era la
+  versión inicial de este ADR. Descartada en la enmienda: cualquier XSS lee
+  `localStorage` y se lleva una sesión de 7 días que no se puede revocar.
+- **Sesiones de servidor (cookie + estado en BD).** Descartada: una consulta
+  de sesión en cada petición y un estado compartido que el JWT evita.
+- **Caducidad por inactividad (7 días desde el último uso).** Descartada:
+  con uso diario la sesión no caduca nunca, tampoco la de un token robado.
 - **Lista negra de tokens en BD (revocación inmediata).** Pospuesta:
   reintroduce el estado que el JWT elimina. Solo si aparece una necesidad
   real.
@@ -58,11 +91,26 @@ con cualquier rol: rotación inmediata (invalida todos los tokens emitidos).
 ## Consecuencias
 
 - (+) El servidor verifica identidad con una operación criptográfica, sin
-  tocar la BD: escala y simplifica.
-- (+) Ventana de daño ante robo de access token acotada a 15 minutos.
-- (+) Encaja con la separación frontend/backend en dominios distintos.
-- (−) **Sin revocación inmediata**: un access token robado es válido hasta
-  su caducidad. Trade-off asumido y documentado; el TTL corto acota la
-  ventana.
-- (−) El frontend debe implementar el flujo de refresh silencioso
-  (interceptor de 401 + reintento).
+  tocar la BD.
+- (+) Un access robado sirve 15 minutos como mucho, y el refresh no es
+  legible desde JavaScript.
+- (+) Ninguna sesión dura más de 7 días.
+- (−) **Sin revocación inmediata.** Dos casos concretos: si se borra una
+  cuenta, su access sigue valiendo hasta 15 minutos en las rutas que no
+  recargan el usuario (`/me` sí lo recarga y responde 401); y cambiar la
+  contraseña no cierra las sesiones abiertas.
+- (−) Hay que volver a entrar cada 7 días aunque se juegue a diario.
+- (−) En desarrollo el frontend también tiene que ir por el mismo origen:
+  proxy de Vite (`/api` → `localhost:8080`). Con eso deja de hacer falta el
+  CORS.
+- (−) El frontend implementa el refresh silencioso (interceptor de 401 +
+  reintento) y manda las peticiones a `/auth` con credenciales.
+
+## Historial
+
+- 2026-07-03: decisión inicial. Refresh en el cuerpo JSON; frontend y backend
+  en dominios distintos.
+- 2026-09-23: frontend y backend en el mismo origen detrás de Caddy. El
+  refresh pasa a una cookie `HttpOnly`, la sesión tiene un tope de 7 días
+  desde el login y se documentan los detalles de endurecimiento que salieron
+  de la revisión de seguridad.
