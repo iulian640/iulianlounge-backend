@@ -83,6 +83,15 @@ class JwtServiceTest {
     }
 
     @Test
+    void refreshTokenIsRejectedAfter7Days() {
+        String token = jwtService.generateRefreshToken(user);
+        JwtService eightDaysLater =
+                new JwtService(SECRET, Clock.fixed(NOW.plus(Duration.ofDays(8)), ZoneOffset.UTC));
+
+        assertThrows(InvalidTokenException.class, () -> eightDaysLater.validateRefreshToken(token));
+    }
+
+    @Test
     void refreshTokenIsNotAcceptedAsAccessToken() {
         String refresh = jwtService.generateRefreshToken(user);
 
