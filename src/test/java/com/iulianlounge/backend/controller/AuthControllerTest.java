@@ -101,4 +101,31 @@ class AuthControllerTest {
 
         verify(registerService, never()).register(any());
     }
+
+    @Test
+    void registerReturns400WhenUsernameIsTooLong() throws Exception {
+        String longUsername = "a".repeat(51);   // la columna es VARCHAR(50)
+
+        expectBadRequest(bodyWith(longUsername, "cursaito@lounge.com", "12345678", "es"));
+    }
+
+    @Test
+    void registerReturns400WhenUsernameHasForbiddenCharacters() throws Exception {
+        expectBadRequest(bodyWith("<script>", "cursaito@lounge.com", "12345678", "es"));
+    }
+
+    private String bodyWith(String username, String email, String password, String locale) {
+        return """
+                {"username":"%s","email":"%s","password":"%s","locale":"%s"}
+                """.formatted(username, email, password, locale);
+    }
+
+    private void expectBadRequest(String body) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+
+        verify(registerService, never()).register(any());
+    }
 }
