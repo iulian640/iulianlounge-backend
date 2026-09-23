@@ -70,11 +70,13 @@ notice it in how the bartender treats you.
 
 ## The bartender (character sheet)
 
-- **Name — DECIDED (2026-07-03):** **Cursaito** in ES, **Dwight** in EN.
+- **Name — UPDATED (2026-07-12, formerly «Cursaito»):** in ES he has no
+  name: he is simply **el Barman**. Ask what he is called and he changes
+  the subject — same as when you ask about Iulian. In EN, **Dwight**.
   Coherence of the joke in EN: the house currency is the Shrutebuck —
   the bartender minted his own currency with his surname and never explains
-  it nor admits it is odd. In ES, Cursaito and the chikilicuatres keep the
-  same pact: absurd names pronounced with absolute seriousness.
+  it nor admits it is odd. In ES, the chikilicuatres carry the crack of
+  absurdity on their own: absurd names pronounced with absolute seriousness.
 - **Age:** indeterminate, between 55 and 70. He has been there "forever".
 - **Past:** he was a croupier, a bookmaker and, according to him, "other
   things past the statute of limitations". He knew Iulian. He is the only
@@ -107,7 +109,7 @@ notice it in how the bartender treats you.
 - **Verbal tics:** "chaval/chavala" (kid), "the house", "that costs brass",
   "I've seen worse".
 
-## Catalog of Cursaito / Dwight lines
+## Catalog of Barman / Dwight lines
 
 > Double duty: the game's personality + **the ADR-05 fallback** (when the
 > LLM fails or times out, these lines reply). They will become i18n keys.
@@ -215,7 +217,7 @@ notice it in how the bartender treats you.
 
 ## Extras for spare days (not the plan)
 
-- **Cursaito's voice (TTS), staged plan**:
+- **The Barman's voice (TTS), staged plan**:
   1. *S7 if a day is left over*: the catalog lines are fixed → generate them
      ONCE with a good voice (raspy, period-appropriate) and store them as
      audio files in the frontend. Cost per use: zero.
