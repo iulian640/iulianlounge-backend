@@ -112,11 +112,15 @@ class JwtServiceTest {
     void wellSignedTokenWithoutValidSubjectIsRejectedAsInvalid() {
         SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
         String noSubject = Jwts.builder()
+                .issuer(JwtService.ISSUER)
+                .audience().add(JwtService.AUDIENCE).and()
                 .claim("type", "access")
                 .expiration(Date.from(NOW.plusSeconds(60)))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
         String notAUuid = Jwts.builder()
+                .issuer(JwtService.ISSUER)
+                .audience().add(JwtService.AUDIENCE).and()
                 .subject("no-soy-un-uuid")
                 .claim("type", "refresh")
                 .expiration(Date.from(NOW.plusSeconds(60)))
@@ -125,6 +129,29 @@ class JwtServiceTest {
 
         assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken(noSubject));
         assertThrows(InvalidTokenException.class, () -> jwtService.validateRefreshToken(notAUuid));
+    }
+
+    @Test
+    void tokenFromAnotherIssuerIsRejectedEvenWithTheSameKey() {
+        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String foreign = Jwts.builder()
+                .issuer("otro-servicio")
+                .audience().add(JwtService.AUDIENCE).and()
+                .subject(user.getId().toString())
+                .claim("type", "access")
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+        String noAudience = Jwts.builder()
+                .issuer(JwtService.ISSUER)
+                .subject(user.getId().toString())
+                .claim("type", "access")
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+
+        assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken(foreign));
+        assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken(noAudience));
     }
 
     @Test

@@ -32,6 +32,9 @@ public class JwtService {
     private static final String TYPE_CLAIM = "type";
     private static final String ACCESS_TYPE = "access";
     private static final String REFRESH_TYPE = "refresh";
+    // Si JWT_SECRET se reutilizara en otro entorno o servicio, sus tokens no valdrían aquí
+    static final String ISSUER = "iulianlounge";
+    static final String AUDIENCE = "iulianlounge-api";
     // Un único mensaje para todo token rechazado: no revela si la firma era buena
     private static final String INVALID_TOKEN = "Token inválido o caducado";
 
@@ -53,6 +56,8 @@ public class JwtService {
     public String generateAccessToken(User user) {
         Instant now = clock.instant();
         return Jwts.builder()
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
                 .subject(user.getId().toString())
                 .claim("username", user.getUsername())
                 .claim("role", user.getRole())
@@ -66,6 +71,8 @@ public class JwtService {
     public String generateRefreshToken(User user) {
         Instant now = clock.instant();
         return Jwts.builder()
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
                 .subject(user.getId().toString())
                 .claim(TYPE_CLAIM, REFRESH_TYPE)
                 .issuedAt(Date.from(now))
@@ -102,6 +109,8 @@ public class JwtService {
         try {
             claims = Jwts.parser()
                     .verifyWith(key)
+                    .requireIssuer(ISSUER)
+                    .requireAudience(AUDIENCE)
                     .clock(() -> Date.from(clock.instant()))
                     .build()
                     .parseSignedClaims(token)
