@@ -21,8 +21,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.iulianlounge.backend.config.SecurityConfig;
 import com.iulianlounge.backend.dto.LoginResponse;
+import com.iulianlounge.backend.dto.RefreshResponse;
 import com.iulianlounge.backend.exception.DuplicateUserException;
 import com.iulianlounge.backend.exception.InvalidCredentialsException;
+import com.iulianlounge.backend.exception.InvalidTokenException;
 import com.iulianlounge.backend.service.AuthService;
 import com.iulianlounge.backend.service.RegisterService;
 
@@ -177,6 +179,43 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(authService, never()).login(any());
+    }
+
+    @Test
+    void refreshReturns200WithNewTokens() throws Exception {
+        when(authService.refresh(any())).thenReturn(new RefreshResponse("access-nuevo", "refresh-nuevo"));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"refresh-valido"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access-nuevo"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-nuevo"));
+    }
+
+    @Test
+    void refreshReturns401WhenTokenIsInvalid() throws Exception {
+        when(authService.refresh(any())).thenThrow(new InvalidTokenException("Token inválido o caducado"));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"caducado"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Token inválido o caducado"));
+    }
+
+    @Test
+    void refreshReturns400WhenTokenIsMissing() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).refresh(any());
     }
 
     private String bodyWith(String username, String email, String password, String locale) {

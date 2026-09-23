@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.iulianlounge.backend.dto.LoginRequest;
 import com.iulianlounge.backend.dto.LoginResponse;
+import com.iulianlounge.backend.dto.RefreshRequest;
+import com.iulianlounge.backend.dto.RefreshResponse;
 import com.iulianlounge.backend.dto.RegisterRequest;
 import com.iulianlounge.backend.dto.RegisterResponse;
 import com.iulianlounge.backend.service.AuthService;
@@ -40,5 +42,10 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/refresh")
+    public RefreshResponse refresh(@Valid @RequestBody RefreshRequest request) {
+        return authService.refresh(request);
     }
 }
