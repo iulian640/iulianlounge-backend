@@ -19,9 +19,10 @@ public class MeController {
         this.userService = userService;
     }
 
-    // Solo llega aquí quien trae un access token válido: el filtro JWT puso sus claims como principal
+    // Solo llega aquí quien trae un access token válido: el filtro JWT puso sus claims como principal.
+    // errorOnInvalidType: si algún día el principal fuera de otro tipo, que falle claro y no con un NPE
     @GetMapping("/me")
-    public MeResponse me(@AuthenticationPrincipal AccessTokenClaims claims) {
+    public MeResponse me(@AuthenticationPrincipal(errorOnInvalidType = true) AccessTokenClaims claims) {
         return userService.getProfile(claims.userId());
     }
 }
