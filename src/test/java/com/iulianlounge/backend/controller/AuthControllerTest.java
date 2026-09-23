@@ -20,7 +20,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.iulianlounge.backend.config.SecurityConfig;
+import com.iulianlounge.backend.dto.LoginResponse;
 import com.iulianlounge.backend.exception.DuplicateUserException;
+import com.iulianlounge.backend.exception.InvalidCredentialsException;
+import com.iulianlounge.backend.service.AuthService;
 import com.iulianlounge.backend.service.RegisterService;
 
 @WebMvcTest(AuthController.class)
@@ -32,6 +35,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private RegisterService registerService;
+
+    @MockitoBean
+    private AuthService authService;
 
     @Test
     void registerReturns201WithUserId() throws Exception {
@@ -131,6 +137,46 @@ class AuthControllerTest {
         String longEmail = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(63) + ".com";
 
         expectBadRequest(bodyWith("cursaito", longEmail, "12345678", "es"));
+    }
+
+    @Test
+    void loginReturns200WithTokens() throws Exception {
+        when(authService.login(any())).thenReturn(new LoginResponse("access-token", "refresh-token", 900));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"cursaito","password":"12345678"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
+                .andExpect(jsonPath("$.expiresIn").value(900));
+    }
+
+    @Test
+    void loginReturns401WhenCredentialsAreWrong() throws Exception {
+        when(authService.login(any())).thenThrow(new InvalidCredentialsException());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"cursaito","password":"mala-clave"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Usuario o contraseña incorrectos"));
+    }
+
+    @Test
+    void loginReturns400WhenPasswordIsMissing() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"cursaito"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).login(any());
     }
 
     private String bodyWith(String username, String email, String password, String locale) {
