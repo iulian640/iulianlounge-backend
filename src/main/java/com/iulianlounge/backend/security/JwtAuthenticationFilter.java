@@ -6,7 +6,9 @@ import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.iulianlounge.backend.exception.InvalidTokenException;
@@ -24,6 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtService jwtService;
+    private final SecurityContextHolderStrategy contextHolder = SecurityContextHolder.getContextHolderStrategy();
 
     public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
@@ -39,9 +42,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 AccessTokenClaims claims = jwtService.validateAccessToken(header.substring(BEARER_PREFIX.length()));
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         claims, null, List.of(new SimpleGrantedAuthority("ROLE_" + claims.role())));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                // Contexto nuevo en vez de modificar el existente (idioma de Spring Security 6+)
+                SecurityContext context = contextHolder.createEmptyContext();
+                context.setAuthentication(authentication);
+                contextHolder.setContext(context);
             } catch (InvalidTokenException ex) {
-                SecurityContextHolder.clearContext();
+                contextHolder.clearContext();
             }
         }
 
