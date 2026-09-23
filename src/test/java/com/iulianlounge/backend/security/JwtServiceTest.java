@@ -109,6 +109,25 @@ class JwtServiceTest {
     }
 
     @Test
+    void wellSignedTokenWithoutValidSubjectIsRejectedAsInvalid() {
+        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        String noSubject = Jwts.builder()
+                .claim("type", "access")
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+        String notAUuid = Jwts.builder()
+                .subject("no-soy-un-uuid")
+                .claim("type", "refresh")
+                .expiration(Date.from(NOW.plusSeconds(60)))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+
+        assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken(noSubject));
+        assertThrows(InvalidTokenException.class, () -> jwtService.validateRefreshToken(notAUuid));
+    }
+
+    @Test
     void garbageTokenIsRejected() {
         assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken("no-soy-un-jwt"));
     }

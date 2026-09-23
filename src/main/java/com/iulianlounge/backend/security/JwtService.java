@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import javax.crypto.SecretKey;
 
@@ -75,14 +76,24 @@ public class JwtService {
 
     public AccessTokenClaims validateAccessToken(String token) {
         Claims claims = parse(token, ACCESS_TYPE);
-        return new AccessTokenClaims(
+        return readOrReject(() -> new AccessTokenClaims(
                 UUID.fromString(claims.getSubject()),
                 claims.get("username", String.class),
-                claims.get("role", String.class));
+                claims.get("role", String.class)));
     }
 
     public UUID validateRefreshToken(String token) {
-        return UUID.fromString(parse(token, REFRESH_TYPE).getSubject());
+        Claims claims = parse(token, REFRESH_TYPE);
+        return readOrReject(() -> UUID.fromString(claims.getSubject()));
+    }
+
+    // Firma buena pero claims rotos (sub ausente o no-UUID): 401, no 500
+    private static <T> T readOrReject(Supplier<T> read) {
+        try {
+            return read.get();
+        } catch (IllegalArgumentException | NullPointerException | JwtException ex) {
+            throw new InvalidTokenException(INVALID_TOKEN);
+        }
     }
 
     // Firma, caducidad y tipo: un refresh no vale como access ni al revés
