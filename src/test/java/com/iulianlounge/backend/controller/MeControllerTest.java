@@ -2,6 +2,8 @@ package com.iulianlounge.backend.controller;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -60,6 +62,26 @@ class MeControllerTest {
                 .andExpect(jsonPath("$.username").value("cursaito"))
                 .andExpect(jsonPath("$.locale").value("es"))
                 .andExpect(jsonPath("$.rank").value("NADIE"));
+    }
+
+    @Test
+    void preflightFromTheDevFrontendIsAllowed() throws Exception {
+        // El preflight no lleva token: si la seguridad lo tratara como anónimo, el navegador bloquearía /me
+        mockMvc.perform(options("/api/v1/me")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "Authorization"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+    }
+
+    @Test
+    void preflightFromAnUnknownOriginIsRejected() throws Exception {
+        mockMvc.perform(options("/api/v1/me")
+                        .header("Origin", "https://evil.example")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 
     @Test
