@@ -242,6 +242,17 @@ class AuthControllerTest {
     }
 
     @Test
+    void registerBadRequestListsEachInvalidField() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWith("cursaito", "no-es-un-email", "123", "es")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists())
+                .andExpect(jsonPath("$.errors.password").exists())
+                .andExpect(jsonPath("$.errors.username").doesNotExist());
+    }
+
+    @Test
     void unknownAuthRouteIsPrivateNotPublic() throws Exception {
         // Antes /api/v1/auth/** era todo público; ahora solo register, login y refresh
         mockMvc.perform(post("/api/v1/auth/logout"))
