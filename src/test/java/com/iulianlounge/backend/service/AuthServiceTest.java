@@ -20,7 +20,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.LoginRequest;
 import com.iulianlounge.backend.dto.LoginResponse;
+import com.iulianlounge.backend.dto.RefreshRequest;
+import com.iulianlounge.backend.dto.RefreshResponse;
 import com.iulianlounge.backend.exception.InvalidCredentialsException;
+import com.iulianlounge.backend.exception.InvalidTokenException;
 import com.iulianlounge.backend.repository.UserRepository;
 import com.iulianlounge.backend.security.JwtService;
 
@@ -79,5 +82,37 @@ class AuthServiceTest {
         InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
                 () -> authService.login(new LoginRequest("nadie", "12345678")));
         assertEquals("Usuario o contraseña incorrectos", ex.getMessage());
+    }
+
+    @Test
+    void refreshReturnsNewTokenPairForValidRefreshToken() {
+        when(jwtService.validateRefreshToken("refresh-valido")).thenReturn(user.getId());
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(jwtService.generateAccessToken(user)).thenReturn("access-nuevo");
+        when(jwtService.generateRefreshToken(user)).thenReturn("refresh-nuevo");
+
+        RefreshResponse response = authService.refresh(new RefreshRequest("refresh-valido"));
+
+        assertEquals("access-nuevo", response.accessToken());
+        assertEquals("refresh-nuevo", response.refreshToken());
+    }
+
+    @Test
+    void refreshPropagatesInvalidTokenFromJwtService() {
+        when(jwtService.validateRefreshToken("caducado"))
+                .thenThrow(new InvalidTokenException("Token inválido o caducado"));
+
+        assertThrows(InvalidTokenException.class,
+                () -> authService.refresh(new RefreshRequest("caducado")));
+        verify(jwtService, never()).generateAccessToken(any());
+    }
+
+    @Test
+    void refreshThrowsWhenUserNoLongerExists() {
+        when(jwtService.validateRefreshToken("refresh-de-cuenta-borrada")).thenReturn(user.getId());
+        when(userRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        assertThrows(InvalidTokenException.class,
+                () -> authService.refresh(new RefreshRequest("refresh-de-cuenta-borrada")));
     }
 }
