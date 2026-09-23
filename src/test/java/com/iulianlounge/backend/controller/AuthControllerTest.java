@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.iulianlounge.backend.config.SecurityConfig;
+import com.iulianlounge.backend.exception.DuplicateUserException;
 import com.iulianlounge.backend.service.RegisterService;
 
 @WebMvcTest(AuthController.class)
@@ -45,5 +46,23 @@ class AuthControllerTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userId").value(userId.toString()));
+    }
+
+    @Test
+    void registerReturns409WhenUserIsDuplicated() throws Exception {
+        // Arrange: el mock lanza la excepción como si el email ya existiera
+        when(registerService.register(any()))
+                .thenThrow(new DuplicateUserException("El email ya está en uso"));
+
+        String body = """
+                {"username":"cursaito","email":"cursaito@lounge.com","password":"12345678","locale":"es"}
+                """;
+
+        // Act + Assert: el handler convierte la excepción en 409 ProblemDetail
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("El email ya está en uso"));
     }
 }
