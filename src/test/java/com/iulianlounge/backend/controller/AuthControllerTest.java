@@ -121,6 +121,11 @@ class AuthControllerTest {
         expectBadRequest(bodyWith("cursaito", "cursaito@lounge.com", longPassword, "es"));
     }
 
+    @Test
+    void registerReturns400WhenLocaleIsNotSupported() throws Exception {
+        expectBadRequest(bodyWith("cursaito", "cursaito@lounge.com", "12345678", "fr"));
+    }
+
     private String bodyWith(String username, String email, String password, String locale) {
         return """
                 {"username":"%s","email":"%s","password":"%s","locale":"%s"}
