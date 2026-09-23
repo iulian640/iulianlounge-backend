@@ -56,7 +56,7 @@ public class JwtService {
                 .claim(TYPE_CLAIM, ACCESS_TYPE)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(ACCESS_TTL)))
-                .signWith(key)
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 
@@ -67,7 +67,7 @@ public class JwtService {
                 .claim(TYPE_CLAIM, REFRESH_TYPE)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(REFRESH_TTL)))
-                .signWith(key)
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 

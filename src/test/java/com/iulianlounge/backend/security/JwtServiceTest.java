@@ -3,10 +3,14 @@ package com.iulianlounge.backend.security;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Date;
 import java.util.UUID;
+
+import javax.crypto.SecretKey;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.exception.InvalidTokenException;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.WeakKeyException;
 
 class JwtServiceTest {
@@ -93,6 +99,21 @@ class JwtServiceTest {
     @Test
     void garbageTokenIsRejected() {
         assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken("no-soy-un-jwt"));
+    }
+
+    @Test
+    void tokensAreSignedWithHs256EvenWithALongSecret() {
+        // Un secreto de 64 bytes haría que jjwt eligiera HS512 si no lo fijáramos
+        String longSecret = "x".repeat(64);
+        JwtService service = new JwtService(longSecret, Clock.fixed(NOW, ZoneOffset.UTC));
+        SecretKey key = Keys.hmacShaKeyFor(longSecret.getBytes(StandardCharsets.UTF_8));
+
+        for (String token : new String[] {service.generateAccessToken(user), service.generateRefreshToken(user)}) {
+            String alg = Jwts.parser().verifyWith(key)
+                    .clock(() -> Date.from(NOW)).build()
+                    .parseSignedClaims(token).getHeader().getAlgorithm();
+            assertEquals("HS256", alg);
+        }
     }
 
     @Test
