@@ -218,6 +218,18 @@ class AuthControllerTest {
         verify(authService, never()).refresh(any());
     }
 
+    @Test
+    void refreshReturns400WhenTokenIsHuge() throws Exception {
+        String huge = "a".repeat(1025);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + huge + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).refresh(any());
+    }
+
     private String bodyWith(String username, String email, String password, String locale) {
         return """
                 {"username":"%s","email":"%s","password":"%s","locale":"%s"}
