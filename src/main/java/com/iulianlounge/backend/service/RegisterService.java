@@ -9,6 +9,7 @@ import com.iulianlounge.backend.exception.DuplicateUserException;
 import com.iulianlounge.backend.repository.UserRepository;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 import com.iulianlounge.backend.domain.User;
@@ -28,7 +29,7 @@ public class RegisterService {
     public UUID register(RegisterRequest request) {
 
 
-        String email = request.email().toLowerCase();
+        String email = request.email().toLowerCase(Locale.ROOT);
 
         if (userRepository.existsByUsername(request.username())) {
             throw new DuplicateUserException("El username ya está en uso");
