@@ -2,6 +2,7 @@ package com.iulianlounge.backend.service;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.iulianlounge.backend.dto.RegisterRequest;
 import com.iulianlounge.backend.exception.DuplicateUserException;
@@ -23,6 +24,7 @@ public class RegisterService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @Transactional
     public UUID register(RegisterRequest request) {
 
 
@@ -44,7 +46,7 @@ public class RegisterService {
         user.setUsername(request.username());
         user.setEmail(email);
         user.setLocale(request.locale());
-        userRepository.save(user);
+        userRepository.saveAndFlush(user);
         return user.getId();
     }
 }

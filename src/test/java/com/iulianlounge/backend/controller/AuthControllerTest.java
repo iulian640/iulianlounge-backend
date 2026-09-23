@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -66,6 +67,23 @@ class AuthControllerTest {
                         .content(body))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("El email ya está en uso"));
+    }
+
+    @Test
+    void registerReturns409WhenDatabaseRejectsDuplicateInARace() throws Exception {
+        // Arrange: dos registros a la vez; el UNIQUE de la BD frena al segundo
+        when(registerService.register(any()))
+                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        String body = """
+                {"username":"cursaito","email":"cursaito@lounge.com","password":"12345678","locale":"es"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("El username o el email ya están en uso"));
     }
 
     @Test

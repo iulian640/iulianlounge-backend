@@ -49,7 +49,7 @@ class RegisterServiceTest {
 
         // Assert: capturamos el User que se guardó para mirarlo por dentro
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(saved.capture());
+        verify(userRepository).saveAndFlush(saved.capture());
         assertEquals(userId, saved.getValue().getId());
         assertEquals("cursaito@lounge.com", saved.getValue().getEmail());
         assertEquals("hash-de-mentira", saved.getValue().getPasswordHash());
@@ -65,7 +65,7 @@ class RegisterServiceTest {
                 () -> registerService.register(request));
 
         assertEquals("El username ya está en uso", ex.getMessage());
-        verify(userRepository, never()).save(any());
+        verify(userRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -77,6 +77,6 @@ class RegisterServiceTest {
                 () -> registerService.register(request));
 
         assertEquals("El email ya está en uso", ex.getMessage());
-        verify(userRepository, never()).save(any());
+        verify(userRepository, never()).saveAndFlush(any());
     }
 }
