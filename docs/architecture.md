@@ -403,8 +403,9 @@ Base: `/api/v1`. Auth = JWT Bearer salvo indicación. Paginación estándar: `?p
 | Método | Ruta | Request → Response |
 |---|---|---|
 | POST | `/auth/register` | {username, email, password, locale} → 201 {userId} |
-| POST | `/auth/login` | {username, password} → {accessToken, refreshToken, expiresIn} |
-| POST | `/auth/refresh` | {refreshToken} → {accessToken, refreshToken} |
+| POST | `/auth/login` | {username, password} → {accessToken, expiresIn} + cookie `refresh_token` (ADR-08) |
+| POST | `/auth/refresh` | sin cuerpo, lee la cookie → {accessToken, expiresIn} + cookie rotada; 401 la borra |
+| POST | `/auth/logout` | sin cuerpo → 204 + cookie borrada |
 
 ### Cartera y economía
 | Método | Ruta | Notas |

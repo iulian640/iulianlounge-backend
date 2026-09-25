@@ -4,8 +4,8 @@
 
 ## Status
 
-Accepted — 2026-07-03. Amended on 2026-09-23 (see History). The refresh
-cookie is not implemented yet; it lands before IUL-29.
+Accepted — 2026-07-03. Amended on 2026-09-23 (see History). Refresh cookie
+and logout implemented on 2026-09-25.
 
 ## Context
 
@@ -73,6 +73,17 @@ CSRF protection stays off. The cookie is only sent with same-site requests
 (`SameSite=Strict`) and only to `/api/v1/auth` routes. Every other route
 authenticates with the `Authorization` header, which a form on another site
 can't set.
+
+Two accepted limits. `SameSite` looks at the site (`iulianlounge.com`), not
+the origin: any subdomain counts as same-site and could plant its own
+`refresh_token` cookie, so there will be no third-party subdomains. And
+`/auth/logout` is public, so another site can force a logout; annoying, but
+it steals nothing.
+
+There is no CORS: production serves everything from one origin and dev goes
+through the Vite proxy. If it is ever needed, never with `allowCredentials`:
+the allowed origin could call `/auth/refresh` with the cookie and read the
+access token.
 
 ## Alternatives considered
 

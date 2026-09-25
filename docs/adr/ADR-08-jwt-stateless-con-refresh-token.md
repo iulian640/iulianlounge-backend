@@ -2,8 +2,8 @@
 
 ## Estado
 
-Aceptada — 2026-07-03. Enmendada el 2026-09-23 (ver Historial). La cookie
-del refresh está pendiente de implementar, antes de IUL-29.
+Aceptada — 2026-07-03. Enmendada el 2026-09-23 (ver Historial). Cookie del
+refresh y logout implementados el 2026-09-25.
 
 ## Contexto
 
@@ -72,6 +72,17 @@ CSRF sigue desactivado. La cookie solo acompaña a peticiones del propio sitio
 (`SameSite=Strict`) y solo a las rutas de `/api/v1/auth`. El resto de rutas
 se autentican con la cabecera `Authorization`, que un formulario de otra web
 no puede poner.
+
+Dos límites aceptados. `SameSite` mira el sitio (`iulianlounge.com`), no el
+origen: cualquier subdominio cuenta como propio y podría plantar su propia
+cookie `refresh_token`, así que no habrá subdominios de terceros. Y
+`/auth/logout` es público, así que otra web puede forzar un logout; molesta,
+pero no roba nada.
+
+No hay CORS: en producción todo va por el mismo origen y en desarrollo por el
+proxy de Vite. Si algún día hiciera falta, nunca con `allowCredentials`: el
+origen permitido podría llamar a `/auth/refresh` con la cookie y leer el
+access.
 
 ## Alternativas consideradas
 

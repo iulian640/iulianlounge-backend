@@ -404,8 +404,9 @@ Base: `/api/v1`. Auth = JWT Bearer unless stated. Standard pagination: `?page=&s
 | Method | Path | Request → Response |
 |---|---|---|
 | POST | `/auth/register` | {username, email, password, locale} → 201 {userId} |
-| POST | `/auth/login` | {username, password} → {accessToken, refreshToken, expiresIn} |
-| POST | `/auth/refresh` | {refreshToken} → {accessToken, refreshToken} |
+| POST | `/auth/login` | {username, password} → {accessToken, expiresIn} + `refresh_token` cookie (ADR-08) |
+| POST | `/auth/refresh` | no body, reads the cookie → {accessToken, expiresIn} + rotated cookie; a 401 clears it |
+| POST | `/auth/logout` | no body → 204 + cleared cookie |
 
 ### Wallet and economy
 | Method | Path | Notes |
