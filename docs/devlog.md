@@ -501,3 +501,55 @@ el LLM del barman, que no puede ser una clave.
 Ninguna de las dos enmiendas está en el código todavía. Van primero en la
 próxima sesión, antes de que el frontend empiece a consumir el login, porque
 cambiar el contrato con un solo lado escrito es barato y con los dos es caro.
+
+## 2026-09-25 — El contrato, antes de que lo lea nadie
+
+Las dos enmiendas del día 23 ya están en el código, y con ellas la tanda de
+limpieza que había dejado la revisión del backend. El frontend todavía no
+llama a la API, así que era el último día barato para cambiar el contrato.
+
+El refresh ya no viaja en el JSON. El login pone una cookie `HttpOnly` que el
+JavaScript de la página no puede leer, el refresh la lee y la rota, y un
+`POST /auth/logout` la borra. La cookie caduca a la vez que el token que lleva
+dentro, así que el tope de siete días desde el login se cumple también en el
+navegador. De paso se fue el CORS: en producción todo sale del mismo origen
+detrás de Caddy y en desarrollo pasará por el proxy de Vite. Un CORS mal
+tocado, con `allowCredentials`, dejaría a otra web pedir un access token con la
+cookie del usuario, y lo que no existe no se puede configurar mal.
+
+Los errores dejaron de ser frases en castellano. Cada uno lleva un `code`
+estable (`auth.invalid_token`, `user.email_taken`) que el frontend traducirá, y
+todos viven en un enum. La revisión de Java encontró tres cosas que el diseño
+no había previsto:
+
+- Un error inesperado salía por la página de error de Spring, sin `code`. Ahora
+  es un 500 `internal.error` y la traza va al log, nunca al cliente.
+- Un campo que falla varias validaciones a la vez devolvía una clave distinta
+  en cada petición, porque el validador no las ordena. Ahora hay una prioridad
+  fija: si falta el valor, eso es lo primero que se dice.
+- Cualquier violación de la base de datos se contestaba como "el usuario ya
+  existe". Con la cartera en camino, una clave foránea rota habría dicho lo
+  mismo. La carrera del registro se traduce ahora en el propio servicio, y el
+  resto es un `data.conflict` genérico.
+
+También cambió cómo se escribe la regla de BCrypt. El límite de 72 bytes era un
+método aparte, y su error salía con el nombre del método, que el frontend no
+habría sabido pegar a ningún campo. Ahora es una anotación propia sobre el
+campo `password`.
+
+La tanda de limpieza fue en cinco commits pequeños. El token deja de llevar el
+nombre de usuario (el payload de un JWT lo lee cualquiera y nadie usaba ese
+dato). El secreto de firma pasa a base64, para que sean 32 bytes aleatorios de
+verdad y no texto tecleado. `role` y `locale` pasan a ser enums, y una
+migración V3 pone un `CHECK` en la base de datos para que tampoco acepte otros
+valores. Esa V3 desplaza la cartera a la V4 y el barman a la V5. Y el test del
+repositorio ahora lee de Postgres de verdad: antes el `findById` devolvía el
+objeto de la caché de Hibernate y no probaba nada.
+
+El reparto siguió como el 23: Claude escribe y explica pieza a pieza, Iulian
+lee, pregunta, ejecuta los tests contra la base de datos y hace los merges. Al
+cierre hay 99 tests y el 98 % de las líneas cubiertas. Cada commit compila y
+pasa los tests por su cuenta, comprobado antes de hacerlo.
+
+El sprint 9 empieza con dos días de retraso, pero sobre un contrato que ya no
+va a cambiar cuando el frontend empiece a leerlo.
