@@ -11,7 +11,6 @@ import java.util.function.Supplier;
 
 import javax.crypto.SecretKey;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -44,13 +43,9 @@ public class JwtService {
     private final SecretKey key;
     private final Clock clock;
 
-    @Autowired
-    public JwtService(@Value("${jwt.secret}") String secret) {
-        this(secret, Clock.systemUTC());
-    }
-
-    // Los tests inyectan un reloj fijo para probar la caducidad sin esperar 15 minutos
-    JwtService(String secret, Clock clock) {
+    // Mismo bean Clock que AuthService: la cookie y el exp del token salen del mismo reloj.
+    // Los tests pasan uno fijo para probar la caducidad sin esperar 15 minutos
+    public JwtService(@Value("${jwt.secret}") String secret, Clock clock) {
         // Lanza WeakKeyException si el secreto tiene menos de 32 bytes: la app no arranca con una clave débil
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.clock = clock;

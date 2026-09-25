@@ -23,6 +23,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.iulianlounge.backend.config.ClockConfig;
 import com.iulianlounge.backend.config.SecurityConfig;
 import com.iulianlounge.backend.domain.Rank;
 import com.iulianlounge.backend.domain.User;
@@ -36,7 +37,7 @@ import io.jsonwebtoken.security.Keys;
 
 // Seguridad REAL (SecurityConfig + filtro + JwtService): aquí se prueba que la cadena protege la ruta
 @WebMvcTest(MeController.class)
-@Import({SecurityConfig.class, JwtService.class})
+@Import({SecurityConfig.class, JwtService.class, ClockConfig.class})
 @TestPropertySource(properties = "jwt.secret=" + MeControllerTest.SECRET)
 class MeControllerTest {
 
