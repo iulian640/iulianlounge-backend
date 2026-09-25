@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Secretos (deploy/.env en el servidor, nunca en git) ###
+.env
+*.env
+!deploy/.env.example
