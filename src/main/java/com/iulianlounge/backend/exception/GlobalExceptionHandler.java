@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.iulianlounge.backend.security.RefreshCookies;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -28,9 +30,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
+    // Refresh rechazado (caducado, cuenta borrada...): además se borra la cookie muerta,
+    // o el navegador la seguiría mandando en cada carga hasta su Max-Age
     @ExceptionHandler(InvalidTokenException.class)
-    public ProblemDetail handleInvalidToken(InvalidTokenException ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    public ResponseEntity<ProblemDetail> handleInvalidToken(InvalidTokenException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .header(HttpHeaders.SET_COOKIE, RefreshCookies.clear().toString())
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage()));
     }
 
     // Dos registros iguales a la vez pasan los existsBy*; el UNIQUE de la BD frena al segundo

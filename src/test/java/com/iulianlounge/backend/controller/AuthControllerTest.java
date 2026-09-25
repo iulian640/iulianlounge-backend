@@ -5,9 +5,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Duration;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -20,14 +22,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.iulianlounge.backend.config.SecurityConfig;
-import com.iulianlounge.backend.dto.LoginResponse;
-import com.iulianlounge.backend.dto.RefreshResponse;
 import com.iulianlounge.backend.exception.DuplicateUserException;
 import com.iulianlounge.backend.exception.InvalidCredentialsException;
 import com.iulianlounge.backend.exception.InvalidTokenException;
 import com.iulianlounge.backend.security.JwtService;
 import com.iulianlounge.backend.service.AuthService;
+import com.iulianlounge.backend.service.IssuedTokens;
 import com.iulianlounge.backend.service.RegisterService;
+
+import jakarta.servlet.http.Cookie;
 
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
@@ -153,8 +156,9 @@ class AuthControllerTest {
     }
 
     @Test
-    void loginReturns200WithTokens() throws Exception {
-        when(authService.login(any())).thenReturn(new LoginResponse("access-token", "refresh-token", 900));
+    void loginReturnsAccessInBodyAndRefreshInCookie() throws Exception {
+        when(authService.login(any()))
+                .thenReturn(new IssuedTokens("access-token", Duration.ofMinutes(15), "refresh-token", Duration.ofDays(7)));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -163,8 +167,15 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
-                .andExpect(jsonPath("$.expiresIn").value(900));
+                .andExpect(jsonPath("$.expiresIn").value(900))
+                // ADR-08: el refresh NUNCA en el cuerpo, donde el JavaScript podría leerlo
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().value("refresh_token", "refresh-token"))
+                .andExpect(cookie().httpOnly("refresh_token", true))
+                .andExpect(cookie().secure("refresh_token", true))
+                .andExpect(cookie().sameSite("refresh_token", "Strict"))
+                .andExpect(cookie().path("refresh_token", "/api/v1/auth"))
+                .andExpect(cookie().maxAge("refresh_token", (int) Duration.ofDays(7).toSeconds()));
     }
 
     @Test
@@ -193,17 +204,21 @@ class AuthControllerTest {
     }
 
     @Test
-    void refreshReturns200WithNewTokens() throws Exception {
-        when(authService.refresh(any())).thenReturn(new RefreshResponse("access-nuevo", "refresh-nuevo"));
+    void refreshReadsTheCookieAndRotatesIt() throws Exception {
+        when(authService.refresh("refresh-valido"))
+                .thenReturn(new IssuedTokens("access-nuevo", Duration.ofMinutes(15), "refresh-nuevo", Duration.ofDays(5)));
 
+        // Sin cuerpo: el navegador adjunta la cookie solo
         mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"refreshToken":"refresh-valido"}
-                                """))
+                        .cookie(new Cookie("refresh_token", "refresh-valido")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-nuevo"))
-                .andExpect(jsonPath("$.refreshToken").value("refresh-nuevo"));
+                .andExpect(jsonPath("$.expiresIn").value(900))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().value("refresh_token", "refresh-nuevo"))
+                .andExpect(cookie().httpOnly("refresh_token", true))
+                // Hereda lo que le quedaba al del login: la sesión no se alarga
+                .andExpect(cookie().maxAge("refresh_token", (int) Duration.ofDays(5).toSeconds()));
     }
 
     @Test
@@ -211,34 +226,44 @@ class AuthControllerTest {
         when(authService.refresh(any())).thenThrow(new InvalidTokenException("Token inválido o caducado"));
 
         mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"refreshToken":"caducado"}
-                                """))
+                        .cookie(new Cookie("refresh_token", "caducado")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.detail").value("Token inválido o caducado"));
+                .andExpect(jsonPath("$.detail").value("Token inválido o caducado"))
+                // La cookie muerta se borra: el navegador deja de mandarla en cada carga
+                .andExpect(cookie().value("refresh_token", ""))
+                .andExpect(cookie().maxAge("refresh_token", 0));
     }
 
     @Test
-    void refreshReturns400WhenTokenIsMissing() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest());
+    void refreshWithoutCookieReachesTheServiceAsNull() throws Exception {
+        // El 401 lo decide el service; el controller no se inventa un 400
+        when(authService.refresh(null)).thenThrow(new InvalidTokenException("Token inválido o caducado"));
 
-        verify(authService, never()).refresh(any());
+        mockMvc.perform(post("/api/v1/auth/refresh"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void refreshReturns400WhenTokenIsHuge() throws Exception {
-        String huge = "a".repeat(1025);
+    void logoutReturns204AndExpiresTheCookie() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().value("refresh_token", ""))
+                .andExpect(cookie().path("refresh_token", "/api/v1/auth"))
+                .andExpect(cookie().maxAge("refresh_token", 0))
+                // Mismos atributos que la original, o el navegador no la reconoce como la misma
+                .andExpect(cookie().httpOnly("refresh_token", true))
+                .andExpect(cookie().secure("refresh_token", true))
+                .andExpect(cookie().sameSite("refresh_token", "Strict"));
+    }
 
-        mockMvc.perform(post("/api/v1/auth/refresh")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"refreshToken\":\"" + huge + "\"}"))
-                .andExpect(status().isBadRequest());
+    @Test
+    void logoutWorksWithAnExpiredAccessToken() throws Exception {
+        // Público a propósito: con el access caducado también tiene que poder salir
+        when(jwtService.validateAccessToken("caducado")).thenThrow(new InvalidTokenException("Token inválido o caducado"));
 
-        verify(authService, never()).refresh(any());
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header("Authorization", "Bearer caducado"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -254,8 +279,8 @@ class AuthControllerTest {
 
     @Test
     void unknownAuthRouteIsPrivateNotPublic() throws Exception {
-        // Antes /api/v1/auth/** era todo público; ahora solo register, login y refresh
-        mockMvc.perform(post("/api/v1/auth/logout"))
+        // Antes /api/v1/auth/** era todo público; ahora solo register, login, refresh y logout
+        mockMvc.perform(post("/api/v1/auth/no-existe"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value("Autenticación requerida"));
     }

@@ -39,7 +39,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Rutas exactas: una ruta nueva bajo /auth nace privada, no pública por accidente
                         .requestMatchers(HttpMethod.POST,
-                                "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
+                                "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
+                                "/api/v1/auth/logout").permitAll()
                         // /error abierto: si no, cualquier 500 o 404 llega al cliente disfrazado de 401
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .anyRequest().authenticated())
