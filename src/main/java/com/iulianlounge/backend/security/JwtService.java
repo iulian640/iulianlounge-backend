@@ -22,7 +22,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
-// ADR-08: access 15 min (sub, username, role) y refresh 7 días (type=refresh), HMAC-SHA256, sin BD
+// ADR-08: access 15 min (sub, role) y refresh 7 días (type=refresh), HMAC-SHA256, sin BD
 @Service
 public class JwtService {
 
@@ -55,7 +55,6 @@ public class JwtService {
                 .issuer(ISSUER)
                 .audience().add(AUDIENCE).and()
                 .subject(user.getId().toString())
-                .claim("username", user.getUsername())
                 .claim("role", user.getRole())
                 .claim(TYPE_CLAIM, ACCESS_TYPE)
                 .issuedAt(Date.from(now))
@@ -91,7 +90,6 @@ public class JwtService {
             }
             return new AccessTokenClaims(
                     UUID.fromString(claims.getSubject()),
-                    claims.get("username", String.class),
                     role);
         });
     }

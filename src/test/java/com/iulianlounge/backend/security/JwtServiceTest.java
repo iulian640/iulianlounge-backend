@@ -1,6 +1,7 @@
 package com.iulianlounge.backend.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
@@ -8,6 +9,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
 
@@ -41,14 +43,23 @@ class JwtServiceTest {
     }
 
     @Test
-    void accessTokenCarriesUserIdUsernameAndRole() {
+    void accessTokenCarriesUserIdAndRole() {
         String token = jwtService.generateAccessToken(user);
 
         AccessTokenClaims claims = jwtService.validateAccessToken(token);
 
         assertEquals(user.getId(), claims.userId());
-        assertEquals("cursaito", claims.username());
         assertEquals("USER", claims.role());
+    }
+
+    @Test
+    void accessTokenDoesNotCarryTheUsername() {
+        // El payload de un JWT es base64 legible por cualquiera: nada de datos personales que no hagan falta
+        String payload = new String(Base64.getUrlDecoder().decode(jwtService.generateAccessToken(user).split("\\.")[1]),
+                StandardCharsets.UTF_8);
+
+        assertFalse(payload.contains("cursaito"));
+        assertFalse(payload.contains("username"));
     }
 
     @Test

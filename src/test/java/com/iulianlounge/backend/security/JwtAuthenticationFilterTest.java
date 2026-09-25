@@ -48,7 +48,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void validBearerTokenAuthenticatesTheRequest() throws Exception {
-        AccessTokenClaims claims = new AccessTokenClaims(UUID.randomUUID(), "cursaito", "USER");
+        AccessTokenClaims claims = new AccessTokenClaims(UUID.randomUUID(), "USER");
         when(jwtService.validateAccessToken("token-bueno")).thenReturn(claims);
         request.addHeader("Authorization", "Bearer token-bueno");
 
