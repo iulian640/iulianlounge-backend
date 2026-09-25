@@ -93,11 +93,12 @@ class MeControllerTest {
     @Test
     void meForADeletedAccountReturns401() throws Exception {
         when(userService.getProfile(user.getId()))
-                .thenThrow(new InvalidTokenException("Token inválido o caducado"));
+                .thenThrow(new InvalidTokenException());
 
         mockMvc.perform(get("/api/v1/me")
                         .header("Authorization", "Bearer " + jwtService.generateAccessToken(user)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("auth.invalid_token"));
     }
 
     @Test
@@ -130,7 +131,7 @@ class MeControllerTest {
     void meWithoutTokenReturns401ProblemDetail() throws Exception {
         mockMvc.perform(get("/api/v1/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.detail").value("Autenticación requerida"));
+                .andExpect(jsonPath("$.code").value("auth.required"));
     }
 
     @Test

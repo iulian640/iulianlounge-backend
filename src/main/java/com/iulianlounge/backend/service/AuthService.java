@@ -20,7 +20,6 @@ public class AuthService {
 
     // Un token real ronda 300 caracteres: el tope evita que nos manden megas a decodificar
     private static final int MAX_REFRESH_TOKEN_LENGTH = 1024;
-    private static final String INVALID_TOKEN = "Token inválido o caducado";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -52,13 +51,13 @@ public class AuthService {
     public IssuedTokens refresh(String refreshToken) {
         // Sin cookie (null) o con basura enorme: 401 como cualquier token malo, sin decodificar nada
         if (refreshToken == null || refreshToken.isBlank() || refreshToken.length() > MAX_REFRESH_TOKEN_LENGTH) {
-            throw new InvalidTokenException(INVALID_TOKEN);
+            throw new InvalidTokenException();
         }
         RefreshTokenClaims claims = jwtService.validateRefreshToken(refreshToken);
 
         // El token puede ser válido y la cuenta ya no existir
         User user = userRepository.findById(claims.userId())
-                .orElseThrow(() -> new InvalidTokenException(INVALID_TOKEN));
+                .orElseThrow(() -> new InvalidTokenException());
 
         return issue(user, clock.instant(), claims.expiresAt());
     }

@@ -15,11 +15,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.RegisterRequest;
 import com.iulianlounge.backend.exception.DuplicateUserException;
+import com.iulianlounge.backend.exception.ErrorCode;
 import com.iulianlounge.backend.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +38,17 @@ class RegisterServiceTest {
     @BeforeEach
     void setUp() {
         registerService = new RegisterService(userRepository, passwordEncoder);
+    }
+
+    @Test
+    void registerTurnsADatabaseDuplicateIntoUserAlreadyExists() {
+        // Carrera: dos registros iguales pasan los existsBy* y el UNIQUE de la BD frena al segundo
+        when(passwordEncoder.encode(any())).thenReturn("hash");
+        when(userRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        DuplicateUserException ex = assertThrows(DuplicateUserException.class,
+                () -> registerService.register(new RegisterRequest("cursaito", "cursaito@lounge.com", "12345678", "es")));
+        assertEquals(ErrorCode.USER_ALREADY_EXISTS, ex.getErrorCode());
     }
 
     @Test
@@ -64,7 +77,7 @@ class RegisterServiceTest {
         DuplicateUserException ex = assertThrows(DuplicateUserException.class,
                 () -> registerService.register(request));
 
-        assertEquals("El username ya está en uso", ex.getMessage());
+        assertEquals(ErrorCode.USER_USERNAME_TAKEN, ex.getErrorCode());
         verify(userRepository, never()).saveAndFlush(any());
     }
 
@@ -76,7 +89,7 @@ class RegisterServiceTest {
         DuplicateUserException ex = assertThrows(DuplicateUserException.class,
                 () -> registerService.register(request));
 
-        assertEquals("El email ya está en uso", ex.getMessage());
+        assertEquals(ErrorCode.USER_EMAIL_TAKEN, ex.getErrorCode());
         verify(userRepository, never()).saveAndFlush(any());
     }
 }

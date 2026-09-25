@@ -1,7 +1,8 @@
 package com.iulianlounge.backend.exception;
 
-public class DuplicateUserException extends RuntimeException {
-    public DuplicateUserException(String message){
-        super(message);
+// USER_USERNAME_TAKEN o USER_EMAIL_TAKEN: el service sabe cuál de los dos chocó
+public class DuplicateUserException extends ApiException {
+    public DuplicateUserException(ErrorCode errorCode) {
+        super(errorCode);
     }
 }

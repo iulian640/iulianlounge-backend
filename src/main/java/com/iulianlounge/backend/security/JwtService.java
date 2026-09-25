@@ -37,8 +37,6 @@ public class JwtService {
     static final String AUDIENCE = "iulianlounge-api";
     // Roles que el filtro puede convertir en ROLE_*: cualquier otro (o ninguno) invalida el token
     private static final Set<String> ALLOWED_ROLES = Set.of("USER", "ADMIN");
-    // Un único mensaje para todo token rechazado: no revela si la firma era buena
-    private static final String INVALID_TOKEN = "Token inválido o caducado";
 
     private final SecretKey key;
     private final Clock clock;
@@ -110,7 +108,7 @@ public class JwtService {
         try {
             return read.get();
         } catch (IllegalArgumentException | NullPointerException | JwtException ex) {
-            throw new InvalidTokenException(INVALID_TOKEN);
+            throw new InvalidTokenException();
         }
     }
 
@@ -127,10 +125,10 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (JwtException | IllegalArgumentException ex) {
-            throw new InvalidTokenException(INVALID_TOKEN);
+            throw new InvalidTokenException();
         }
         if (!expectedType.equals(claims.get(TYPE_CLAIM, String.class))) {
-            throw new InvalidTokenException(INVALID_TOKEN);
+            throw new InvalidTokenException();
         }
         return claims;
     }

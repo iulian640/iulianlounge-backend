@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.iulianlounge.backend.config.SecurityConfig;
 import com.iulianlounge.backend.exception.DuplicateUserException;
+import com.iulianlounge.backend.exception.ErrorCode;
 import com.iulianlounge.backend.exception.InvalidCredentialsException;
 import com.iulianlounge.backend.exception.InvalidTokenException;
 import com.iulianlounge.backend.security.JwtService;
@@ -70,7 +71,7 @@ class AuthControllerTest {
     void registerReturns409WhenUserIsDuplicated() throws Exception {
         // Arrange: el mock lanza la excepción como si el email ya existiera
         when(registerService.register(any()))
-                .thenThrow(new DuplicateUserException("El email ya está en uso"));
+                .thenThrow(new DuplicateUserException(ErrorCode.USER_EMAIL_TAKEN));
 
         String body = """
                 {"username":"cursaito","email":"cursaito@lounge.com","password":"12345678","locale":"es"}
@@ -81,14 +82,17 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("El email ya está en uso"));
+                // ADR-06: el frontend lee code; detail es inglés y solo para depurar
+                .andExpect(jsonPath("$.code").value("user.email_taken"))
+                .andExpect(jsonPath("$.detail").value("Email already in use"));
     }
 
     @Test
-    void registerReturns409WhenDatabaseRejectsDuplicateInARace() throws Exception {
-        // Arrange: dos registros a la vez; el UNIQUE de la BD frena al segundo
+    void anyOtherDatabaseConflictIsAGenericConflictNotUserAlreadyExists() throws Exception {
+        // La carrera del registro la traduce el RegisterService; aquí llega cualquier otra (FK, CHECK...)
+        // y no debe decirle al usuario "ya existe"
         when(registerService.register(any()))
-                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+                .thenThrow(new DataIntegrityViolationException("violates foreign key constraint"));
 
         String body = """
                 {"username":"cursaito","email":"cursaito@lounge.com","password":"12345678","locale":"es"}
@@ -98,7 +102,44 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("El username o el email ya están en uso"));
+                .andExpect(jsonPath("$.code").value("data.conflict"));
+    }
+
+    @Test
+    void unexpectedExceptionIsA500WithCodeAndNoInternalMessage() throws Exception {
+        when(authService.login(any())).thenThrow(new IllegalStateException("pool de conexiones agotado"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"cursaito","password":"12345678"}
+                                """))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("internal.error"))
+                // El mensaje interno va al log, nunca al cliente
+                .andExpect(jsonPath("$.detail").value("Internal error"));
+    }
+
+    @Test
+    void emptyUsernameAlwaysReportsNotBlankFirst() throws Exception {
+        // "" falla @NotBlank, @Size y @Pattern a la vez: la clave tiene que ser siempre la misma
+        for (int i = 0; i < 20; i++) {
+            mockMvc.perform(post("/api/v1/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(bodyWith("", "cursaito@lounge.com", "", "es")))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors.username").value("validation.not_blank"))
+                    .andExpect(jsonPath("$.errors.password").value("validation.not_blank"));
+        }
+    }
+
+    @Test
+    void unsupportedMediaTypeKeepsItsStatusAndCarriesACode() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("cursaito"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("request.rejected"));
     }
 
     @Test
@@ -188,7 +229,7 @@ class AuthControllerTest {
                                 {"username":"cursaito","password":"mala-clave"}
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.detail").value("Usuario o contraseña incorrectos"));
+                .andExpect(jsonPath("$.code").value("auth.invalid_credentials"));
     }
 
     @Test
@@ -223,12 +264,12 @@ class AuthControllerTest {
 
     @Test
     void refreshReturns401WhenTokenIsInvalid() throws Exception {
-        when(authService.refresh(any())).thenThrow(new InvalidTokenException("Token inválido o caducado"));
+        when(authService.refresh(any())).thenThrow(new InvalidTokenException());
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refresh_token", "caducado")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.detail").value("Token inválido o caducado"))
+                .andExpect(jsonPath("$.code").value("auth.invalid_token"))
                 // La cookie muerta se borra: el navegador deja de mandarla en cada carga
                 .andExpect(cookie().value("refresh_token", ""))
                 .andExpect(cookie().maxAge("refresh_token", 0));
@@ -237,7 +278,7 @@ class AuthControllerTest {
     @Test
     void refreshWithoutCookieReachesTheServiceAsNull() throws Exception {
         // El 401 lo decide el service; el controller no se inventa un 400
-        when(authService.refresh(null)).thenThrow(new InvalidTokenException("Token inválido o caducado"));
+        when(authService.refresh(null)).thenThrow(new InvalidTokenException());
 
         mockMvc.perform(post("/api/v1/auth/refresh"))
                 .andExpect(status().isUnauthorized());
@@ -259,7 +300,7 @@ class AuthControllerTest {
     @Test
     void logoutWorksWithAnExpiredAccessToken() throws Exception {
         // Público a propósito: con el access caducado también tiene que poder salir
-        when(jwtService.validateAccessToken("caducado")).thenThrow(new InvalidTokenException("Token inválido o caducado"));
+        when(jwtService.validateAccessToken("caducado")).thenThrow(new InvalidTokenException());
 
         mockMvc.perform(post("/api/v1/auth/logout")
                         .header("Authorization", "Bearer caducado"))
@@ -272,9 +313,21 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bodyWith("cursaito", "no-es-un-email", "123", "es")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.email").exists())
-                .andExpect(jsonPath("$.errors.password").exists())
+                .andExpect(jsonPath("$.code").value("validation.failed"))
+                // Claves, no mensajes del validador (cambian con el Accept-Language)
+                .andExpect(jsonPath("$.errors.email").value("validation.email"))
+                .andExpect(jsonPath("$.errors.password").value("validation.size"))
                 .andExpect(jsonPath("$.errors.username").doesNotExist());
+    }
+
+    @Test
+    void malformedJsonStillCarriesACode() throws Exception {
+        // Errores que genera Spring, no nuestro código: también llevan code
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{esto no es json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("request.rejected"));
     }
 
     @Test
@@ -282,7 +335,7 @@ class AuthControllerTest {
         // Antes /api/v1/auth/** era todo público; ahora solo register, login, refresh y logout
         mockMvc.perform(post("/api/v1/auth/no-existe"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.detail").value("Autenticación requerida"));
+                .andExpect(jsonPath("$.code").value("auth.required"));
     }
 
     private String bodyWith(String username, String email, String password, String locale) {

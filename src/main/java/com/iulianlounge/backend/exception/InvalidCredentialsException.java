@@ -1,8 +1,8 @@
 package com.iulianlounge.backend.exception;
 
-public class InvalidCredentialsException extends RuntimeException {
+public class InvalidCredentialsException extends ApiException {
     public InvalidCredentialsException() {
-        // Mismo mensaje para usuario inexistente y contraseña mala: no revela qué usernames existen
-        super("Usuario o contraseña incorrectos");
+        // Mismo código para usuario inexistente y contraseña mala: no revela qué usernames existen
+        super(ErrorCode.AUTH_INVALID_CREDENTIALS);
     }
 }

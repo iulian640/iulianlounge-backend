@@ -26,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.LoginRequest;
+import com.iulianlounge.backend.exception.ErrorCode;
 import com.iulianlounge.backend.exception.InvalidCredentialsException;
 import com.iulianlounge.backend.exception.InvalidTokenException;
 import com.iulianlounge.backend.repository.UserRepository;
@@ -90,7 +91,7 @@ class AuthServiceTest {
 
         InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
                 () -> authService.login(new LoginRequest("nadie", "12345678")));
-        assertEquals("Usuario o contraseña incorrectos", ex.getMessage());
+        assertEquals(ErrorCode.AUTH_INVALID_CREDENTIALS, ex.getErrorCode());
     }
 
     @Test
@@ -114,7 +115,7 @@ class AuthServiceTest {
     @Test
     void refreshPropagatesInvalidTokenFromJwtService() {
         when(jwtService.validateRefreshToken("caducado"))
-                .thenThrow(new InvalidTokenException("Token inválido o caducado"));
+                .thenThrow(new InvalidTokenException());
 
         assertThrows(InvalidTokenException.class, () -> authService.refresh("caducado"));
         verify(jwtService, never()).generateAccessToken(any());
@@ -151,7 +152,7 @@ class AuthServiceTest {
     void refreshStillDecodesATokenOfExactly1024Characters() {
         // El límite es > 1024: justo 1024 sí llega a validarse
         String atLimit = "a".repeat(1024);
-        when(jwtService.validateRefreshToken(atLimit)).thenThrow(new InvalidTokenException("Token inválido o caducado"));
+        when(jwtService.validateRefreshToken(atLimit)).thenThrow(new InvalidTokenException());
 
         assertThrows(InvalidTokenException.class, () -> authService.refresh(atLimit));
         verify(jwtService).validateRefreshToken(atLimit);

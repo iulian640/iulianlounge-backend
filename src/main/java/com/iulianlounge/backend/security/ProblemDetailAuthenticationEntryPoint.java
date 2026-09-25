@@ -9,6 +9,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
+import com.iulianlounge.backend.exception.ErrorCode;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -16,8 +18,10 @@ import jakarta.servlet.http.HttpServletResponse;
 // Sin esto Spring Security contesta 403 vacío. El cuerpo es fijo: no se refleja nada de la petición.
 public class ProblemDetailAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
+    // Mismo code y detail que ErrorCode.AUTH_REQUIRED (ADR-06): el frontend lo trata como cualquier otro error
     private static final String BODY = """
-            {"type":"about:blank","title":"Unauthorized","status":401,"detail":"Autenticación requerida"}""";
+            {"type":"about:blank","title":"Unauthorized","status":401,"detail":"%s","code":"%s"}"""
+            .formatted(ErrorCode.AUTH_REQUIRED.detail(), ErrorCode.AUTH_REQUIRED.key());
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)

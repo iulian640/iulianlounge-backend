@@ -62,7 +62,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void invalidTokenLeavesTheRequestUnauthenticatedButContinues() throws Exception {
-        when(jwtService.validateAccessToken("token-malo")).thenThrow(new InvalidTokenException("Token inválido o caducado"));
+        when(jwtService.validateAccessToken("token-malo")).thenThrow(new InvalidTokenException());
         request.addHeader("Authorization", "Bearer token-malo");
 
         filter.doFilter(request, new MockHttpServletResponse(), chain);

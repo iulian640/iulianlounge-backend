@@ -22,7 +22,7 @@ public class UserService {
     public MeResponse getProfile(UUID userId) {
         // Access token válido de una cuenta ya borrada: se trata como token inválido (401)
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new InvalidTokenException("Token inválido o caducado"));
+                .orElseThrow(() -> new InvalidTokenException());
 
         // TODO sprint 9: el rango se calculará con la cartera; hasta entonces todos empiezan en NADIE
         return new MeResponse(user.getId(), user.getUsername(), user.getLocale(), Rank.NADIE);

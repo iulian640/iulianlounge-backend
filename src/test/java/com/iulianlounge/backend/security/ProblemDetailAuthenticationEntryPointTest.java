@@ -20,6 +20,6 @@ class ProblemDetailAuthenticationEntryPointTest {
         assertEquals(401, response.getStatus());
         assertEquals("Bearer", response.getHeader("WWW-Authenticate"));
         assertTrue(response.getContentType().startsWith("application/problem+json"));
-        assertTrue(response.getContentAsString().contains("\"detail\":\"Autenticación requerida\""));
+        assertTrue(response.getContentAsString().contains("\"code\":\"auth.required\""));
     }
 }
