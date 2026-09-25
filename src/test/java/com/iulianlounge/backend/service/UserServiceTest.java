@@ -13,6 +13,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.iulianlounge.backend.domain.Rank;
+import com.iulianlounge.backend.domain.Language;
+import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.MeResponse;
 import com.iulianlounge.backend.exception.InvalidTokenException;
@@ -29,7 +31,7 @@ class UserServiceTest {
         User user = new User();
         user.setId(UUID.randomUUID());
         user.setUsername("cursaito");
-        user.setLocale("es");
+        user.setLocale(Language.ES);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
         MeResponse profile = new UserService(userRepository).getProfile(user.getId());

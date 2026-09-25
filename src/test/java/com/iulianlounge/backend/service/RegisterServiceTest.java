@@ -18,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.iulianlounge.backend.domain.Language;
+import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.RegisterRequest;
 import com.iulianlounge.backend.exception.DuplicateUserException;
@@ -67,6 +69,8 @@ class RegisterServiceTest {
         assertEquals("cursaito@lounge.com", saved.getValue().getEmail());
         assertEquals("hash-de-mentira", saved.getValue().getPasswordHash());
         assertEquals("cursaito", saved.getValue().getUsername());
+        assertEquals(Role.USER, saved.getValue().getRole());
+        assertEquals(Language.ES, saved.getValue().getLocale());
     }
 
     @Test

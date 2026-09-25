@@ -4,15 +4,18 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.exception.InvalidTokenException;
 
@@ -35,8 +38,9 @@ public class JwtService {
     // Si JWT_SECRET se reutilizara en otro entorno o servicio, sus tokens no valdrían aquí
     static final String ISSUER = "iulianlounge";
     static final String AUDIENCE = "iulianlounge-api";
-    // Roles que el filtro puede convertir en ROLE_*: cualquier otro (o ninguno) invalida el token
-    private static final Set<String> ALLOWED_ROLES = Set.of("USER", "ADMIN");
+    // Roles que el filtro puede convertir en ROLE_*: los del enum; cualquier otro (o ninguno) invalida el token
+    private static final Set<String> ALLOWED_ROLES =
+            Arrays.stream(Role.values()).map(Role::name).collect(Collectors.toUnmodifiableSet());
 
     private final SecretKey key;
     private final Clock clock;
@@ -56,7 +60,7 @@ public class JwtService {
                 .issuer(ISSUER)
                 .audience().add(AUDIENCE).and()
                 .subject(user.getId().toString())
-                .claim("role", user.getRole())
+                .claim("role", user.getRole().name())
                 .claim(TYPE_CLAIM, ACCESS_TYPE)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(ACCESS_TTL)))

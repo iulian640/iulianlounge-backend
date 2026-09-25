@@ -7,6 +7,8 @@ import org.springframework.data.domain.Persistable;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
@@ -23,8 +25,9 @@ public class User implements Persistable<UUID> {
     private String email;
     @Column(length = 60)
     private String passwordHash;
-    private String role;
-    private String locale;
+    @Enumerated(EnumType.STRING)
+    private Role role;
+    private Language locale;   // LanguageConverter (autoApply): "es"/"en" en la columna
     private Instant createdAt;
     private Instant lastSeenAt;
     @Transient
@@ -62,19 +65,19 @@ public class User implements Persistable<UUID> {
         this.passwordHash = passwordHash;
     }
 
-    public String getRole() {
+    public Role getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(Role role) {
         this.role = role;
     }
 
-    public String getLocale() {
+    public Language getLocale() {
         return locale;
     }
 
-    public void setLocale(String locale) {
+    public void setLocale(Language locale) {
         this.locale = locale;
     }
 

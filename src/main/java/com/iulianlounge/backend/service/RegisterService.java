@@ -14,6 +14,8 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
 
+import com.iulianlounge.backend.domain.Language;
+import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 
 @Service
@@ -44,11 +46,11 @@ public class RegisterService {
         User user = new User();
         user.setId(UUID.randomUUID());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setRole( "USER");
+        user.setRole(Role.USER);
         user.setCreatedAt(Instant.now());
         user.setUsername(request.username());
         user.setEmail(email);
-        user.setLocale(request.locale());
+        user.setLocale(Language.fromCode(request.locale()));
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {

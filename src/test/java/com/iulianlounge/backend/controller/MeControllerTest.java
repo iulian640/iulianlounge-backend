@@ -29,6 +29,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.iulianlounge.backend.config.ClockConfig;
 import com.iulianlounge.backend.config.SecurityConfig;
 import com.iulianlounge.backend.domain.Rank;
+import com.iulianlounge.backend.domain.Language;
+import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.MeResponse;
 import com.iulianlounge.backend.exception.InvalidTokenException;
@@ -62,7 +64,7 @@ class MeControllerTest {
         user = new User();
         user.setId(UUID.randomUUID());
         user.setUsername("cursaito");
-        user.setRole("USER");
+        user.setRole(Role.USER);
     }
 
     @Test

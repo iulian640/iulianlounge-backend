@@ -25,6 +25,6 @@ public class UserService {
                 .orElseThrow(() -> new InvalidTokenException());
 
         // TODO sprint 9: el rango se calculará con la cartera; hasta entonces todos empiezan en NADIE
-        return new MeResponse(user.getId(), user.getUsername(), user.getLocale(), Rank.NADIE);
+        return new MeResponse(user.getId(), user.getUsername(), user.getLocale().code(), Rank.NADIE);
     }
 }

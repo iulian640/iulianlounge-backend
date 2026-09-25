@@ -10,6 +10,8 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import com.iulianlounge.backend.domain.Language;
+import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 
 @DataJpaTest
@@ -26,16 +28,16 @@ class UserRepositoryTest {
         user.setUsername("cursaito");
         user.setEmail("cursaito@gmail.com");
         user.setPasswordHash("hash-de-mentira");
-        user.setRole("PLAYER");
-        user.setLocale("es");
+        user.setRole(Role.USER);
+        user.setLocale(Language.ES);
         user.setCreatedAt(Instant.now());
         userRepository.save(user);
         User retrieved = userRepository.findById(user.getId()).orElseThrow();
         assertEquals("cursaito", retrieved.getUsername());
         assertEquals("cursaito@gmail.com", retrieved.getEmail());
         assertEquals("hash-de-mentira", retrieved.getPasswordHash());
-        assertEquals("PLAYER", retrieved.getRole());
-        assertEquals("es", retrieved.getLocale());
+        assertEquals(Role.USER, retrieved.getRole());
+        assertEquals(Language.ES, retrieved.getLocale());
         assertEquals(user.getCreatedAt(), retrieved.getCreatedAt());
     }
 
@@ -46,8 +48,8 @@ class UserRepositoryTest {
         user.setUsername("dwight");
         user.setEmail("dwight@lounge.com");
         user.setPasswordHash("hash-de-mentira");
-        user.setRole("USER");
-        user.setLocale("en");
+        user.setRole(Role.USER);
+        user.setLocale(Language.EN);
         user.setCreatedAt(Instant.now());
         userRepository.save(user);
 

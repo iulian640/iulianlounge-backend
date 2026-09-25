@@ -18,6 +18,8 @@ import javax.crypto.SecretKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.iulianlounge.backend.domain.Language;
+import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.exception.InvalidTokenException;
 
@@ -40,7 +42,7 @@ class JwtServiceTest {
         user = new User();
         user.setId(UUID.randomUUID());
         user.setUsername("cursaito");
-        user.setRole("USER");
+        user.setRole(Role.USER);
     }
 
     @Test
