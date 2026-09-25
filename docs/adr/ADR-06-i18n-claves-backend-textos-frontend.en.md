@@ -4,9 +4,11 @@
 
 ## Status
 
-Accepted — 2026-07-03. Amended on 2026-09-23 (see History). The error `code`
-field and the `ErrorCode` enum are not implemented yet; they land before
-IUL-29.
+Accepted — 2026-07-03. Amended on 2026-09-23 (see History). The `code`
+field, the `ErrorCode` enum and the validation keys
+(`validation.<constraint>`, e.g. `validation.not_blank`) were implemented on
+2026-09-25. Errors raised by Spring itself (malformed JSON, 405...) carry
+`request.rejected`.
 
 ## Context
 
@@ -51,6 +53,14 @@ only thing the frontend reads:
   validator messages, which change with `Accept-Language`.
 - Every code lives in a single `ErrorCode` enum in the backend. It is the
   complete list the frontend's dictionaries have to cover.
+- When a field fails several constraints, one key is sent using a fixed
+  priority (`not_null`, `not_blank`, `size`, `pattern`, `email`,
+  `max_utf8_bytes`), so the same input always yields the same key.
+- Keys carry no limits (`validation.size` doesn't say 3 or 50). The frontend
+  repeats the DTO limits in its messages; changing one in the backend means
+  changing it there too.
+- Anything unexpected comes out as `internal.error` (500) and the details go
+  only to the server log.
 
 ### Exception: LLM-generated text
 

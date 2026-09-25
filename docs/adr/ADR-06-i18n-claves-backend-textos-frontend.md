@@ -3,8 +3,10 @@
 ## Estado
 
 Aceptada — 2026-07-03. Enmendada el 2026-09-23 (ver Historial). El campo
-`code` de los errores y el enum `ErrorCode` están pendientes de implementar,
-antes de IUL-29.
+`code`, el enum `ErrorCode` y las claves de validación
+(`validation.<restricción>`, p. ej. `validation.not_blank`) se implementaron
+el 2026-09-25. Los errores que genera Spring (JSON roto, 405...) llevan
+`request.rejected`.
 
 ## Contexto
 
@@ -50,6 +52,14 @@ Cada error es un `ProblemDetail` (RFC 7807) con un campo `code`, que es lo
   mensajes del validador, que cambian según el `Accept-Language`.
 - Todos los códigos viven en un único enum `ErrorCode` del backend. Es la
   lista completa que el frontend tiene que cubrir en sus diccionarios.
+- Si un campo falla varias restricciones, se manda una sola clave con
+  prioridad fija (`not_null`, `not_blank`, `size`, `pattern`, `email`,
+  `max_utf8_bytes`), así la misma entrada da siempre la misma clave.
+- Las claves no llevan los límites (`validation.size` no dice 3 ni 50). El
+  frontend repite los límites de los DTOs en sus mensajes; si cambia uno en
+  el backend, hay que cambiarlo también allí.
+- Lo no previsto sale como `internal.error` (500) y el detalle va solo al
+  log del servidor.
 
 ### Excepción: texto generado por el LLM
 
