@@ -9,22 +9,27 @@ navegador ──https──> Caddy (web) ──/api──> backend ──> postg
                         └─ resto: la SPA (dist del frontend)
 ```
 
+## Dónde vive
+
+Desde el 25-sep-2026, en una instancia ARM (aarch64) de Oracle Cloud en Madrid,
+`ubuntu@82.70.85.197`, la misma que antes servía MeDeben (ya apagada; su copia
+está en `~/backups/`). Todas las imágenes del compose tienen versión ARM.
+
 ## Una sola vez
 
-1. **VPS**: Hetzner CX22 (Ubuntu 24.04), con tu clave SSH pública al crearlo.
-2. **DNS**: en el registrador de `iulianlounge.com`, dos registros `A` a la IP del
-   VPS: `@` y `www`. Comprueba con `dig +short iulianlounge.com` que ya responde
-   la IP antes del paso 5: Caddy necesita el DNS para pedir el certificado.
-3. **En el VPS**, instala Docker y abre solo SSH, 80 y 443:
-   ```bash
-   curl -fsSL https://get.docker.com | sh
-   ufw allow OpenSSH && ufw allow 80,443/tcp && ufw allow 443/udp && ufw enable
-   ```
+1. **Servidor**: Ubuntu con Docker. En Oracle, los puertos 80 y 443 tienen que
+   estar abiertos en la *security list* de la VCN y en el `iptables` de la
+   máquina (en esta instancia ya lo estaban por MeDeben).
+2. **Nada más en el 80/443**: si hay un Caddy o nginx instalado en el sistema,
+   apágalo (`sudo systemctl disable --now caddy`); el de la compose se encarga.
+3. **DNS** en Cloudflare: dos registros `A` a la IP del servidor, `@` y `www`,
+   con la nube en **gris (DNS only)**. Con la nube naranja, Cloudflare pone su
+   propio HTTPS delante y choca con el certificado de Caddy.
 4. **Código y secretos**:
    ```bash
    git clone https://github.com/iulian640/iulianlounge-backend.git && cd iulianlounge-backend
    cp deploy/.env.example deploy/.env
-   nano deploy/.env        # rellena cada secreto con: openssl rand -base64 32
+   sed -i "s|^POSTGRES_ADMIN_PASSWORD=.*|POSTGRES_ADMIN_PASSWORD=$(openssl rand -hex 24)|; s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -hex 24)|; s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 32)|" deploy/.env
    chmod 600 deploy/.env
    ```
 5. **Arranque**:
@@ -42,7 +47,14 @@ docker compose -f deploy/docker-compose.prod.yml logs -f backend
 
 Y en el navegador: hacerse socio, entrar al lounge, recargar y seguir dentro.
 
+Si Caddy no consigue el certificado justo después de crear el DNS, es la caché
+negativa: los resolvedores de Let's Encrypt recuerdan el "no existe" de un
+intento anterior hasta 30 minutos (el mínimo del SOA de la zona). No reinicies
+en bucle, que Let's Encrypt limita los fallos por dominio: Caddy reintenta solo.
+
 ## Cada despliegue
+
+Uno por sesión de trabajo, al final, no uno por arreglo.
 
 ```bash
 cd iulianlounge-backend && git pull
@@ -67,5 +79,8 @@ docker exec lounge-db psql -U postgres -d iulianlounge -c \
 - No añadir `ports` a `postgres` ni a `backend`: Docker se salta `ufw`, y el
   puerto quedaría abierto a internet.
 - No cambiar `JWT_SECRET` salvo que se haya filtrado: cierra todas las sesiones.
-- No borrar el volumen `pgdata`: es la base de datos. El script de
-  `postgres-init/` solo corre con el volumen vacío.
+- No borrar el volumen `iulianlounge_pgdata`: es la base de datos. El script
+  de `postgres-init/` solo corre con el volumen vacío.
+- No usar `docker compose -p deploy ...` en este servidor: `deploy` era el
+  proyecto de MeDeben. El del lounge se llama `iulianlounge` (fijado en la
+  compose).
