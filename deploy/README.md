@@ -52,6 +52,16 @@ docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --
 El frontend se construye desde su repo en GitHub, en la rama de `FRONTEND_REF`
 (`main` por defecto): lo que se despliega es lo que está en esa rama.
 
+## BD de desarrollo creada antes del 25-sep
+
+La V2 se renombró (errata `insesnsitive`). Una BD local que ya la tenía aplicada
+falla en la validación de Flyway hasta que se actualiza su historial:
+
+```bash
+docker exec lounge-db psql -U postgres -d iulianlounge -c \
+  "UPDATE flyway_schema_history SET description = 'make email unique case insensitive', script = 'V2__make_email_unique_case_insensitive.sql' WHERE version = '2';"
+```
+
 ## Qué no hacer
 
 - No añadir `ports` a `postgres` ni a `backend`: Docker se salta `ufw`, y el
