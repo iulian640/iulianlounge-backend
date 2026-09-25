@@ -16,6 +16,8 @@ import javax.crypto.SecretKey;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -76,24 +78,16 @@ class MeControllerTest {
                 .andExpect(jsonPath("$.rank").value("NADIE"));
     }
 
-    @Test
-    void preflightFromTheDevFrontendIsAllowed() throws Exception {
-        // El preflight no lleva token: si la seguridad lo tratara como anónimo, el navegador bloquearía /me
-        mockMvc.perform(options("/api/v1/me")
-                        .header("Origin", "http://localhost:5173")
-                        .header("Access-Control-Request-Method", "GET")
-                        .header("Access-Control-Request-Headers", "Authorization"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
-    }
-
-    @Test
-    void preflightFromAnUnknownOriginIsRejected() throws Exception {
-        mockMvc.perform(options("/api/v1/me")
-                        .header("Origin", "https://evil.example")
-                        .header("Access-Control-Request-Method", "GET"))
-                .andExpect(status().isForbidden())
-                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    @ParameterizedTest
+    @ValueSource(strings = {"http://localhost:5173", "https://evil.example"})
+    void noOriginGetsCorsPermission(String origin) throws Exception {
+        // ADR-08: sin CORS (mismo origen en prod, proxy de Vite en dev). Ningún origen ajeno,
+        // ni el de dev, recibe permiso: el navegador bloquea la respuesta y nadie lee el access de /refresh
+        mockMvc.perform(options("/api/v1/auth/refresh")
+                        .header("Origin", origin)
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
     }
 
     @Test
