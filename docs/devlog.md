@@ -553,3 +553,36 @@ pasa los tests por su cuenta, comprobado antes de hacerlo.
 
 El sprint 9 empieza con dos días de retraso, pero sobre un contrato que ya no
 va a cambiar cuando el frontend empiece a leerlo.
+
+### La tarde: la cartera, la puerta y el dominio
+
+A media mañana Iulian cambió el calendario: a partir de ahora solo trabaja
+en el proyecto los viernes. Quedan dos antes de la entrega, el 2 y el 9 de
+octubre, así que el resto del día fue sprint 9 a toda máquina.
+
+La cartera ya existe. Una migración V4 crea el saldo y el libro de
+movimientos, con un `CHECK` que impide un saldo negativo en la propia base de
+datos. Cada movimiento escribe el libro y el saldo en la misma transacción, y
+cada cuenta nueva nace con 100 chikilicuatres. La revisión encontró el fallo
+más fino del día: el reintento ante escrituras simultáneas solo funciona si la
+operación abre su propia transacción, porque dentro de otra relee la cartera
+vieja. Ahora `credit` y `debit` se niegan a correr dentro de otra transacción,
+y la regla quedó escrita en el ADR-04.
+
+En el frontend llegaron la pantalla de acceso, el HUD con la ficha del saldo y
+el libro de cuentas, y un salón en 2D para el móvil, que no arranca WebGPU. Hubo
+un intento de convertir la pantalla de acceso en una puerta de madera con
+mirilla; Iulian lo vio, no le convenció y volvió a la tarjeta. Con las mismas
+capturas salieron de la sala los dos músicos inmóviles del escenario, los
+sillones se giraron hacia su mesa y los taburetes hacia la barra (el frente de
+cada modelo se midió en el fichero, porque adivinarlo falló una vez), y el lado
+este ganó dos lámparas de pie. La revisión de Vue encontró huecos de sesión: una
+sesión caducada dentro del lounge no devolvía a la puerta, y un logout con un
+refresh a medias podía resucitarla. Están cerrados, con tests.
+
+Y el club está en internet: [iulianlounge.com](https://iulianlounge.com), en el
+servidor de Oracle que antes servía MeDeben, que nadie usaba y se apagó.
+Caddy pone el HTTPS, la base de datos no se ve desde fuera y la app entra con
+un rol sin privilegios de superusuario. El certificado tardó un rato porque
+Let's Encrypt recordaba que el dominio no existía cuando lo intentó por
+primera vez.
