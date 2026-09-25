@@ -1,6 +1,5 @@
 package com.iulianlounge.backend.security;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,6 +19,7 @@ import com.iulianlounge.backend.exception.InvalidTokenException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
 // ADR-08: access 15 min (sub, role) y refresh 7 días (type=refresh), HMAC-SHA256, sin BD
@@ -44,8 +44,9 @@ public class JwtService {
     // Mismo bean Clock que AuthService: la cookie y el exp del token salen del mismo reloj.
     // Los tests pasan uno fijo para probar la caducidad sin esperar 15 minutos
     public JwtService(@Value("${jwt.secret}") String secret, Clock clock) {
-        // Lanza WeakKeyException si el secreto tiene menos de 32 bytes: la app no arranca con una clave débil
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        // JWT_SECRET en base64 (openssl rand -base64 32): así la clave son bytes aleatorios de verdad, no texto tecleable.
+        // No arranca si no es base64 (DecodingException) o si decodifica a menos de 32 bytes (WeakKeyException)
+        this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
         this.clock = clock;
     }
 

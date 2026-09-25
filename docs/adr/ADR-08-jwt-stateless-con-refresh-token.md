@@ -63,8 +63,9 @@ IUL-21):
 - Todos los tokens rechazados reciben el mismo mensaje, que no revela el
   motivo.
 
-La clave de firma vive en la variable de entorno `JWT_SECRET` (32 bytes o
-más), jamás en el repo, que es público. Si se filtrase permitiría fabricar
+La clave de firma vive en la variable de entorno `JWT_SECRET`, en base64 y
+de 32 bytes o más (`openssl rand -base64 32`), jamás en el repo, que es
+público. Si se filtrase permitiría fabricar
 tokens de cualquier usuario con cualquier rol: rotación inmediata, que
 invalida todos los tokens emitidos.
 

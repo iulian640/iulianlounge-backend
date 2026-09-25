@@ -22,12 +22,13 @@ import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.exception.InvalidTokenException;
 
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.DecodingException;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.WeakKeyException;
 
 class JwtServiceTest {
 
-    private static final String SECRET = "test-secret-que-tiene-mas-de-32-bytes!!";
+    private static final String SECRET = "dGVzdC1zZWNyZXQtcXVlLXRpZW5lLW1hcy1kZS0zMi1ieXRlcyEh";
     private static final Instant NOW = Instant.parse("2026-09-23T12:00:00Z");
 
     private JwtService jwtService;
@@ -130,7 +131,7 @@ class JwtServiceTest {
 
     @Test
     void tokenSignedWithAnotherKeyIsRejected() {
-        JwtService otherKey = new JwtService("otro-secreto-distinto-de-mas-de-32-bytes", Clock.fixed(NOW, ZoneOffset.UTC));
+        JwtService otherKey = new JwtService("b3Ryby1zZWNyZXRvLWRpc3RpbnRvLWRlLW1hcy1kZS0zMi1ieXRlcw==", Clock.fixed(NOW, ZoneOffset.UTC));
         String forged = otherKey.generateAccessToken(user);
 
         assertThrows(InvalidTokenException.class, () -> jwtService.validateAccessToken(forged));
@@ -146,7 +147,7 @@ class JwtServiceTest {
 
     @Test
     void wellSignedTokenWithoutValidSubjectIsRejectedAsInvalid() {
-        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        SecretKey key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(SECRET));
         String noSubject = Jwts.builder()
                 .issuer(JwtService.ISSUER)
                 .audience().add(JwtService.AUDIENCE).and()
@@ -169,7 +170,7 @@ class JwtServiceTest {
 
     @Test
     void tokenFromAnotherIssuerIsRejectedEvenWithTheSameKey() {
-        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        SecretKey key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(SECRET));
         String foreign = Jwts.builder()
                 .issuer("otro-servicio")
                 .audience().add(JwtService.AUDIENCE).and()
@@ -192,7 +193,7 @@ class JwtServiceTest {
 
     @Test
     void accessTokenWithMissingOrUnknownRoleIsRejected() {
-        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        SecretKey key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(SECRET));
         String noRole = Jwts.builder()
                 .issuer(JwtService.ISSUER)
                 .audience().add(JwtService.AUDIENCE).and()
@@ -223,9 +224,9 @@ class JwtServiceTest {
     @Test
     void tokensAreSignedWithHs256EvenWithALongSecret() {
         // Un secreto de 64 bytes haría que jjwt eligiera HS512 si no lo fijáramos
-        String longSecret = "x".repeat(64);
-        JwtService service = new JwtService(longSecret, Clock.fixed(NOW, ZoneOffset.UTC));
-        SecretKey key = Keys.hmacShaKeyFor(longSecret.getBytes(StandardCharsets.UTF_8));
+        byte[] longKey = "x".repeat(64).getBytes(StandardCharsets.UTF_8);
+        JwtService service = new JwtService(Base64.getEncoder().encodeToString(longKey), Clock.fixed(NOW, ZoneOffset.UTC));
+        SecretKey key = Keys.hmacShaKeyFor(longKey);
 
         for (String token : new String[] {service.generateAccessToken(user), service.generateRefreshToken(user)}) {
             String alg = Jwts.parser().verifyWith(key)
@@ -237,6 +238,14 @@ class JwtServiceTest {
 
     @Test
     void shortSecretIsRefusedAtStartup() {
-        assertThrows(WeakKeyException.class, () -> new JwtService("corto", Clock.systemUTC()));
+        // "corto" en base64: 5 bytes, muy lejos de los 32 que pide HS256
+        assertThrows(WeakKeyException.class, () -> new JwtService("Y29ydG8=", Clock.systemUTC()));
+    }
+
+    @Test
+    void secretThatIsNotBase64IsRefusedAtStartup() {
+        // JWT_SECRET se genera con `openssl rand -base64 32`; un texto plano es un error de configuración
+        assertThrows(DecodingException.class,
+                () -> new JwtService("esto no es base64 y tiene más de 32 bytes!!", Clock.systemUTC()));
     }
 }

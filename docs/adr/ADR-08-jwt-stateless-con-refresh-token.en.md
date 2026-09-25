@@ -64,8 +64,9 @@ Implementation details that harden the decision (IUL-19, IUL-20 and IUL-21):
 - Only roles from a closed list become `ROLE_*`.
 - Every rejected token gets the same message, which doesn't reveal why.
 
-The signing key lives in the `JWT_SECRET` environment variable (32 bytes or
-more), never in the repo, which is public. If it leaked it would allow
+The signing key lives in the `JWT_SECRET` environment variable, base64 and
+32 bytes or more (`openssl rand -base64 32`), never in the repo, which is
+public. If it leaked it would allow
 forging tokens for any user with any role: immediate rotation, which
 invalidates every issued token.
 

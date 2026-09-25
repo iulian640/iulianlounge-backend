@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
 
@@ -43,7 +44,7 @@ import io.jsonwebtoken.security.Keys;
 @TestPropertySource(properties = "jwt.secret=" + MeControllerTest.SECRET)
 class MeControllerTest {
 
-    static final String SECRET = "test-secret-que-tiene-mas-de-32-bytes!!";
+    static final String SECRET = "dGVzdC1zZWNyZXQtcXVlLXRpZW5lLW1hcy1kZS0zMi1ieXRlcyEh";
 
     @Autowired
     private MockMvc mockMvc;
@@ -104,7 +105,7 @@ class MeControllerTest {
     @Test
     void meWithExpiredAccessTokenReturns401() throws Exception {
         // Firmado con la clave buena, iss/aud correctos, pero caducado hace un minuto
-        SecretKey key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        SecretKey key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(SECRET));
         String expired = Jwts.builder()
                 .issuer("iulianlounge")
                 .audience().add("iulianlounge-api").and()
