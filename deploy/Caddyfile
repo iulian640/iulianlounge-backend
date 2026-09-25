@@ -1,0 +1,35 @@
+# Caddy pide y renueva el certificado de Let's Encrypt solo. HTTPS es obligatorio: WebGPU exige contexto seguro
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		# Un año de HTTPS obligatorio, también en subdominios
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Sin firma del servidor
+		-Server
+	}
+
+	# La API y el health, al backend por la red interna de Docker
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+	handle /actuator/health {
+		reverse_proxy backend:8080
+	}
+
+	# Todo lo demás es la SPA: si la ruta no es un fichero (p. ej. /acceso), index.html y decide vue-router
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# www → dominio desnudo
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}

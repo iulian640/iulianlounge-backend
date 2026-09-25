@@ -1,0 +1,12 @@
+# Al contexto de Docker solo va lo que necesita el build: ni target, ni docs, ni secretos
+target/
+.git/
+.claude/
+.idea/
+.vscode/
+docs/
+presentacion/
+deploy/
+*.env
+.env
+*.md

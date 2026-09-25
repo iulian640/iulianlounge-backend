@@ -1,0 +1,73 @@
+# Producción en un VPS: Caddy (HTTPS + frontend + proxy de /api), backend y Postgres.
+# Todo por el mismo origen: el navegador solo habla con Caddy, y la cookie del refresh viaja sin CORS (ADR-08).
+# Uso (desde la raíz del repo, en el servidor):
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: iulianlounge
+      # Superusuario solo para crear la BD y el rol de la app (init/). La app NO entra con él
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      APP_DB_USER: ${DB_USERNAME}
+      APP_DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    # Sin "ports": la BD no se publica. Solo la ven los contenedores de esta red
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER} -d iulianlounge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/iulianlounge
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    # Sin "ports" tampoco: solo Caddy le habla, por la red interna
+
+  web:
+    # El frontend se construye desde su repo de GitHub y se sirve con Caddy, que además pone el HTTPS
+    build:
+      context: https://github.com/iulian640/iulianlounge-frontend.git#${FRONTEND_REF:-main}
+      dockerfile_inline: |
+        FROM node:22-alpine AS build
+        WORKDIR /app
+        COPY package*.json ./
+        RUN npm ci
+        COPY . .
+        RUN npm run build
+        FROM caddy:2-alpine
+        COPY --from=build /app/dist /srv
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados de Let's Encrypt: fuera del contenedor para no pedirlos en cada despliegue
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
