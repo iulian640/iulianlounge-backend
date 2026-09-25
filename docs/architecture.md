@@ -3,12 +3,12 @@
 > Documento de diseño. Complementa a [`CONCEPT.md`](../CONCEPT.md) (concepto de producto).
 > Objetivo: arquitectura por capas clásica de Spring, sin sobreingeniería, con la
 > economía de fichas como núcleo transaccional del sistema.
-> Última revisión: 2026-07-14 (nombres de la ficción, estado de implementación,
-> índice case-insensitive de email, ADRs expandidos, contexto frontend).
+> Última revisión: 2026-09-25 (estado tras el sprint 8, respuestas sin
+> envoltorio, errores con `code`, endpoints de auth y `/me`).
 
 **Decisión transversal previa a todo**: las fichas se representan como enteros (`BIGINT` / `long`), nunca decimales ni `double`. Toda mutación de saldo pasa por un único servicio (`WalletService`) y queda registrada en un ledger append-only. Todo lo demás del sistema (blackjack, katas, tienda, incremental, préstamos) son *clientes* de ese servicio.
 
-**Estado de implementación (2026-07-14, Sprint 1):** hecho — esqueleto Spring Boot 4.1 + PostgreSQL 17 en Docker (IUL-14/15), CI con gate JaCoCo 80% de líneas (IUL-16), migraciones V1 (tabla `users`) y V2 (unicidad de email case-insensitive por índice sobre `lower(email)`), entidad `User` + `UserRepository` con tests contra el Postgres real (IUL-17). En curso — IUL-18 `POST /auth/register` (servicio con BCrypt y normalización de email a minúsculas hecha; faltan controller, handler 409 y tests MockMvc). Todo lo demás de este documento sigue siendo diseño pendiente. Flujo git: ramas feature desde `dev`; `main` solo al cierre de cada sprint.
+**Estado de implementación (2026-09-25, sprint 8 cerrado):** hecho el esqueleto (Spring Boot 4.1, PostgreSQL 17 en Docker, CI con JaCoCo al 80 %) y la autenticación completa: registro, login, refresh con cookie `HttpOnly`, logout, filtro JWT y `GET /me` (IUL-18 a IUL-21, ADR-08). Errores con `code` estable y enum `ErrorCode` (ADR-06). Migraciones V1 (`users`), V2 (email único sin distinguir mayúsculas) y V3 (`CHECK` de `role` y `locale`). Siguiente: cartera y ledger (V4, sprint 9). Blackjack, retos, tienda, incremental y social quedan fuera del PMV (épica IUL-54): sus secciones se conservan como diseño, no como plan. Flujo git: ramas feature desde `dev`, y `main` se iguala a `dev` al cerrar cada ticket.
 
 ---
 
@@ -397,7 +397,7 @@ Notas de diseño:
 
 ## 3. Catálogo de endpoints REST
 
-Base: `/api/v1`. Auth = JWT Bearer salvo indicación. Paginación estándar: `?page=&size=` con envelope `{content, page, size, totalElements}`. Todas las respuestas usan envelope `{success, data, error}`.
+Base: `/api/v1`. Auth = JWT Bearer salvo indicación. Paginación estándar: `?page=&size=` con `{content, page, size, totalElements}`. Las respuestas son JSON plano, sin envoltorio; los errores, `ProblemDetail` con `code` (ver Transversal).
 
 ### Auth (público)
 | Método | Ruta | Request → Response |
@@ -406,6 +406,11 @@ Base: `/api/v1`. Auth = JWT Bearer salvo indicación. Paginación estándar: `?p
 | POST | `/auth/login` | {username, password} → {accessToken, expiresIn} + cookie `refresh_token` (ADR-08) |
 | POST | `/auth/refresh` | sin cuerpo, lee la cookie → {accessToken, expiresIn} + cookie rotada; 401 la borra |
 | POST | `/auth/logout` | sin cuerpo → 204 + cookie borrada |
+
+### Perfil
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `/me` | → {userId, username, locale, rank}. El nombre sale de la BD, no del token |
 
 ### Cartera y economía
 | Método | Ruta | Notas |
@@ -463,8 +468,8 @@ Base: `/api/v1`. Auth = JWT Bearer salvo indicación. Paginación estándar: `?p
 | GET | `/social/presence` | Últimos N usuarios activos: {username, outfit, lastActivityType, lastActivityAt} |
 
 ### Transversal
-- `GET /actuator/health` público; OpenAPI en `/swagger-ui` (solo perfil dev).
-- Errores: RFC 7807 (`problem+json`) vía `@RestControllerAdvice`.
+- `GET /actuator/health` público. No hay Swagger: el contrato está en este catálogo y en el README.
+- Errores: RFC 7807 (`problem+json`) vía `@RestControllerAdvice`, con `code` estable que traduce el frontend, `detail` en inglés y `errors` campo → clave en los 400 de validación (ADR-06). Lo no previsto sale como `internal.error` (500).
 - Convención: escrituras con efectos económicos son siempre POST con `idempotencyKey`.
 
 ---

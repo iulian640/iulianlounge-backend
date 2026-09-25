@@ -4,12 +4,12 @@
 > Design document. Complements [`CONCEPT.en.md`](../CONCEPT.en.md) (product concept).
 > Goal: classic layered Spring architecture, no overengineering, with the
 > token economy as the transactional core of the system.
-> Last revised: 2026-07-14 (fiction names, implementation status,
-> case-insensitive email index, expanded ADRs, frontend context).
+> Last revised: 2026-09-25 (status after sprint 8, no response envelope,
+> errors with `code`, auth endpoints and `/me`).
 
 **Cross-cutting decision before everything else**: tokens are represented as integers (`BIGINT` / `long`), never decimals or `double`. Every balance mutation goes through a single service (`WalletService`) and is recorded in an append-only ledger. Everything else in the system (blackjack, katas, shop, incremental, loans) are *clients* of that service.
 
-**Implementation status (2026-07-14, Sprint 1):** done — Spring Boot 4.1 skeleton + PostgreSQL 17 in Docker (IUL-14/15), CI with a JaCoCo 80% line-coverage gate (IUL-16), migrations V1 (`users` table) and V2 (case-insensitive email uniqueness via an index on `lower(email)`), `User` entity + `UserRepository` with tests against the real Postgres (IUL-17). In progress — IUL-18 `POST /auth/register` (service with BCrypt and email lowercasing done; controller, 409 handler and MockMvc tests pending). Everything else in this document is still pending design. Git flow: feature branches from `dev`; `main` only at each sprint close.
+**Implementation status (2026-09-25, sprint 8 closed):** done: the skeleton (Spring Boot 4.1, PostgreSQL 17 in Docker, CI with an 80 % JaCoCo gate) and the whole of authentication: register, login, refresh with an `HttpOnly` cookie, logout, JWT filter and `GET /me` (IUL-18 to IUL-21, ADR-08). Errors carry a stable `code` from the `ErrorCode` enum (ADR-06). Migrations V1 (`users`), V2 (case-insensitive unique email) and V3 (`CHECK` on `role` and `locale`). Next: wallet and ledger (V4, sprint 9). Blackjack, challenges, shop, incremental and social are out of the MVP (epic IUL-54): their sections stay as design, not as plan. Git flow: feature branches from `dev`, and `main` is brought level with `dev` when each ticket closes.
 
 ---
 
@@ -398,7 +398,7 @@ Design notes:
 
 ## 3. REST endpoint catalog
 
-Base: `/api/v1`. Auth = JWT Bearer unless stated. Standard pagination: `?page=&size=` with envelope `{content, page, size, totalElements}`. All responses use the envelope `{success, data, error}`.
+Base: `/api/v1`. Auth = JWT Bearer unless stated. Standard pagination: `?page=&size=` with `{content, page, size, totalElements}`. Responses are plain JSON with no envelope; errors are a `ProblemDetail` with a `code` (see Cross-cutting).
 
 ### Auth (public)
 | Method | Path | Request → Response |
@@ -407,6 +407,11 @@ Base: `/api/v1`. Auth = JWT Bearer unless stated. Standard pagination: `?page=&s
 | POST | `/auth/login` | {username, password} → {accessToken, expiresIn} + `refresh_token` cookie (ADR-08) |
 | POST | `/auth/refresh` | no body, reads the cookie → {accessToken, expiresIn} + rotated cookie; a 401 clears it |
 | POST | `/auth/logout` | no body → 204 + cleared cookie |
+
+### Profile
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/me` | → {userId, username, locale, rank}. The name comes from the DB, not the token |
 
 ### Wallet and economy
 | Method | Path | Notes |
@@ -464,8 +469,8 @@ Base: `/api/v1`. Auth = JWT Bearer unless stated. Standard pagination: `?page=&s
 | GET | `/social/presence` | Last N active users: {username, outfit, lastActivityType, lastActivityAt} |
 
 ### Cross-cutting
-- `GET /actuator/health` public; OpenAPI at `/swagger-ui` (dev profile only).
-- Errors: RFC 7807 (`problem+json`) via `@RestControllerAdvice`.
+- `GET /actuator/health` public. There is no Swagger: the contract lives in this catalogue and in the README.
+- Errors: RFC 7807 (`problem+json`) via `@RestControllerAdvice`, with a stable `code` the frontend translates, an English `detail`, and `errors` field → key on validation 400s (ADR-06). Anything unexpected comes out as `internal.error` (500).
 - Convention: writes with economic effects are always POST with an `idempotencyKey`.
 
 ---
