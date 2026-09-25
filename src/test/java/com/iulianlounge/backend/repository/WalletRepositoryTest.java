@@ -19,6 +19,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 
+import jakarta.persistence.PersistenceException;
+
 import com.iulianlounge.backend.domain.Language;
 import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.TokenTransaction;
@@ -65,8 +67,19 @@ class WalletRepositoryTest {
     @Test
     void databaseRejectsANegativeBalance() {
         // CHECK (balance >= 0): la última defensa si Java dejara pasar un débito de más
-        assertThrows(Exception.class, () -> entityManager.getEntityManager()
+        assertThrows(PersistenceException.class, () -> entityManager.getEntityManager()
                 .createNativeQuery("UPDATE wallet SET balance = -1 WHERE id = :id")
+                .setParameter("id", wallet.getId())
+                .executeUpdate());
+    }
+
+    @Test
+    void aWalletWithMovementsCannotBeDeleted() {
+        // Append-only (ADR-04): borrar la cartera no puede llevarse el ledger por delante
+        transactionRepository.saveAndFlush(welcome(wallet, null));
+
+        assertThrows(PersistenceException.class, () -> entityManager.getEntityManager()
+                .createNativeQuery("DELETE FROM wallet WHERE id = :id")
                 .setParameter("id", wallet.getId())
                 .executeUpdate());
     }
@@ -108,7 +121,7 @@ class WalletRepositoryTest {
         entityManager.clear();
 
         List<TokenTransaction> history = transactionRepository
-                .findByWalletIdOrderByCreatedAtDesc(wallet.getId(), PageRequest.of(0, 10))
+                .findByWalletIdOrderByCreatedAtDescIdDesc(wallet.getId(), PageRequest.of(0, 10))
                 .getContent();
 
         assertEquals(List.of(105L, 100L), history.stream().map(TokenTransaction::getBalanceAfter).toList());

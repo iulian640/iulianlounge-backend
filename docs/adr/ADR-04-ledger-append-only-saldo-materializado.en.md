@@ -41,6 +41,15 @@ Rules that keep both in sync:
    (double-clicking "bet") die at the database.
 5. CHECK constraint `balance >= 0`: the last line of defense lives in the
    DB, not in Java.
+6. `credit`/`debit` open their own transaction and refuse to run inside
+   someone else's: the retry in rule 3 has to re-read the wallet in a clean
+   transaction. A caller that needs its own writes and the chip movement to
+   commit together (the bartender) hands its work to `WalletService` instead
+   of wrapping it. (Added 2026-09-25, after review.)
+7. The ledger is never deleted: `ON DELETE RESTRICT` in the DB and a
+   repository with no delete methods. GDPR account erasure will be an
+   explicit operation that decides what happens to the movements.
+   (2026-09-25.)
 
 ## Alternatives considered
 

@@ -24,6 +24,9 @@ public enum ErrorCode {
     WALLET_INSUFFICIENT_FUNDS("wallet.insufficient_funds", HttpStatus.UNPROCESSABLE_CONTENT, "Insufficient funds"),
     // Dos escrituras a la vez sobre la misma cartera y el reintento también chocó (ADR-04)
     WALLET_CONFLICT("wallet.conflict", HttpStatus.CONFLICT, "Wallet was updated concurrently, try again"),
+    // Una clave de idempotencia reutilizada para otra operación (otra cantidad o tipo): bug del cliente
+    WALLET_IDEMPOTENCY_MISMATCH("wallet.idempotency_mismatch", HttpStatus.CONFLICT,
+            "Idempotency key already used for a different movement"),
 
     // Cualquier otra violación de la BD (FK, CHECK...): no le decimos al usuario qué chocó
     DATA_CONFLICT("data.conflict", HttpStatus.CONFLICT, "Data conflict"),

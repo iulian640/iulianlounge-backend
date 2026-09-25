@@ -5,15 +5,18 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.Repository;
 
 import com.iulianlounge.backend.domain.TokenTransaction;
 
-// ADR-04: solo WalletService lo usa, y solo para insertar y leer (el ledger no se modifica)
-public interface TokenTransactionRepository extends JpaRepository<TokenTransaction, UUID> {
+// ADR-04: el ledger es append-only. Repository a secas (no JpaRepository) para no ofrecer delete ni deleteAll:
+// solo se puede insertar y leer. Solo WalletService lo usa
+public interface TokenTransactionRepository extends Repository<TokenTransaction, UUID> {
+
+    TokenTransaction saveAndFlush(TokenTransaction transaction);
 
     Optional<TokenTransaction> findByWalletIdAndIdempotencyKey(UUID walletId, String idempotencyKey);
 
-    // Usa el índice (wallet_id, created_at DESC) de la V4
-    Page<TokenTransaction> findByWalletIdOrderByCreatedAtDesc(UUID walletId, Pageable pageable);
+    // Usa el índice (wallet_id, created_at DESC, id DESC) de la V4
+    Page<TokenTransaction> findByWalletIdOrderByCreatedAtDescIdDesc(UUID walletId, Pageable pageable);
 }

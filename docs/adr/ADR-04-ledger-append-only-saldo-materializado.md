@@ -38,6 +38,14 @@ Reglas que mantienen ambos sincronizados:
 4. `idempotencyKey` UNIQUE en el ledger: los reintentos duplicados del
    cliente (doble clic en "apostar") mueren en la base de datos.
 5. Constraint CHECK `balance >= 0`: la última defensa está en la BD, no en Java.
+6. `credit`/`debit` abren su propia transacción y se niegan a correr dentro
+   de otra: el reintento de la regla 3 necesita releer la cartera en una
+   transacción limpia. Quien necesite que sus escrituras y el movimiento de
+   fichas vayan juntos (el barman) le pasará su trabajo a `WalletService`
+   en vez de envolverlo. (Añadida el 2026-09-25, tras la revisión.)
+7. El ledger no se borra: `ON DELETE RESTRICT` en la BD y un repositorio sin
+   métodos de borrado. El borrado de cuenta por RGPD será una operación
+   explícita que decida qué hacer con los movimientos. (2026-09-25.)
 
 ## Alternativas consideradas
 

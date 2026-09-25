@@ -10,10 +10,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.iulianlounge.backend.domain.TokenTransaction;
 import com.iulianlounge.backend.domain.TransactionType;
 import com.iulianlounge.backend.domain.Wallet;
+import com.iulianlounge.backend.exception.IdempotencyMismatchException;
 import com.iulianlounge.backend.exception.InsufficientFundsException;
 import com.iulianlounge.backend.exception.WalletConflictException;
 import com.iulianlounge.backend.exception.WalletNotFoundException;
@@ -43,18 +45,23 @@ public class WalletService {
         this.clock = clock;
     }
 
-    // Lo llama RegisterService dentro de su transacción: si algo falla aquí, tampoco se crea el usuario
+    // Cartera + bono en una sola transacción. Desde RegisterService se une a la suya (usuario, cartera y bono
+    // van juntos o ninguno); llamado desde otro sitio, abre una propia. Nunca queda una cartera sin su movimiento
     public TokenTransaction openWallet(UUID userId) {
-        Wallet wallet = walletRepository.saveAndFlush(new Wallet(userId, clock.instant()));
-        return apply(wallet, WELCOME_BONUS, TransactionType.WELCOME_BONUS, null);
+        return transactions.execute(status -> {
+            Wallet wallet = walletRepository.saveAndFlush(new Wallet(userId, clock.instant()));
+            return apply(wallet, WELCOME_BONUS, TransactionType.WELCOME_BONUS, null);
+        });
     }
 
     public TokenTransaction credit(UUID userId, long amount, TransactionType type, String idempotencyKey) {
+        requireOwnTransaction();
         requirePositive(amount);
         return withOneRetry(() -> applyTo(userId, amount, type, idempotencyKey));
     }
 
     public TokenTransaction debit(UUID userId, long amount, TransactionType type, String idempotencyKey) {
+        requireOwnTransaction();
         requirePositive(amount);
         return withOneRetry(() -> applyTo(userId, -amount, type, idempotencyKey));
     }
@@ -64,7 +71,7 @@ public class WalletService {
     }
 
     public Page<TokenTransaction> getTransactions(UUID userId, Pageable pageable) {
-        return transactionRepository.findByWalletIdOrderByCreatedAtDesc(findWallet(userId).getId(), pageable);
+        return transactionRepository.findByWalletIdOrderByCreatedAtDescIdDesc(findWallet(userId).getId(), pageable);
     }
 
     private TokenTransaction applyTo(UUID userId, long signedAmount, TransactionType type, String idempotencyKey) {
@@ -75,6 +82,10 @@ public class WalletService {
             Optional<TokenTransaction> previous =
                     transactionRepository.findByWalletIdAndIdempotencyKey(wallet.getId(), idempotencyKey);
             if (previous.isPresent()) {
+                // Misma clave para otra cantidad u otro tipo: no es un reintento, es un bug del cliente
+                if (previous.get().getAmount() != signedAmount || previous.get().getType() != type) {
+                    throw new IdempotencyMismatchException();
+                }
                 return previous.get();
             }
         }
@@ -111,6 +122,15 @@ public class WalletService {
 
     private Wallet findWallet(UUID userId) {
         return walletRepository.findByUserId(userId).orElseThrow(WalletNotFoundException::new);
+    }
+
+    // El reintento solo funciona en una transacción propia: dentro de la de otro, el segundo intento
+    // reutilizaría la cartera vieja del primero y la transacción ya estaría marcada para rollback.
+    // Quien necesite atomicidad con sus propias escrituras (el barman) tendrá que pasarlas aquí dentro (ADR-04)
+    private static void requireOwnTransaction() {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("WalletService.credit/debit must run in its own transaction");
+        }
     }
 
     private static void requirePositive(long amount) {

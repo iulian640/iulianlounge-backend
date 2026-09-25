@@ -26,10 +26,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.iulianlounge.backend.domain.TokenTransaction;
 import com.iulianlounge.backend.domain.TransactionType;
 import com.iulianlounge.backend.domain.Wallet;
+import com.iulianlounge.backend.exception.IdempotencyMismatchException;
 import com.iulianlounge.backend.exception.InsufficientFundsException;
 import com.iulianlounge.backend.exception.WalletConflictException;
 import com.iulianlounge.backend.exception.WalletNotFoundException;
@@ -146,6 +148,29 @@ class WalletServiceTest {
         assertSame(original, result);
         assertEquals(80, wallet.getBalance());
         verify(walletRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void sameIdempotencyKeyWithADifferentAmountIsRejected() {
+        // Reusar una clave para otra operación es un bug del cliente: no se tapa devolviendo la vieja
+        TokenTransaction original = new TokenTransaction(WALLET_ID, 30, TransactionType.WELCOME_BONUS, 80, "clave-1", NOW);
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(80)));
+        when(transactionRepository.findByWalletIdAndIdempotencyKey(WALLET_ID, "clave-1")).thenReturn(Optional.of(original));
+
+        assertThrows(IdempotencyMismatchException.class,
+                () -> walletService.debit(USER_ID, 30, TransactionType.WELCOME_BONUS, "clave-1"));
+    }
+
+    @Test
+    void creditRefusesToJoinSomeoneElsesTransaction() {
+        // El reintento necesita una transacción propia; dentro de otra, releería la cartera vieja (ADR-04)
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertThrows(IllegalStateException.class,
+                    () -> walletService.credit(USER_ID, 10, TransactionType.WELCOME_BONUS, null));
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
     }
 
     @Test
