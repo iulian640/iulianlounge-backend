@@ -18,6 +18,13 @@ public enum ErrorCode {
     // Carrera entre dos registros: el UNIQUE de la BD no dice cuál de los dos campos chocó
     USER_ALREADY_EXISTS("user.already_exists", HttpStatus.CONFLICT, "Username or email already in use"),
 
+    // Una cuenta sin cartera: no debería pasar (V4 dio una a los usuarios antiguos), pero que falle claro
+    WALLET_NOT_FOUND("wallet.not_found", HttpStatus.NOT_FOUND, "Wallet not found"),
+    // 422: la petición es correcta, pero no hay fichas para pagarla
+    WALLET_INSUFFICIENT_FUNDS("wallet.insufficient_funds", HttpStatus.UNPROCESSABLE_CONTENT, "Insufficient funds"),
+    // Dos escrituras a la vez sobre la misma cartera y el reintento también chocó (ADR-04)
+    WALLET_CONFLICT("wallet.conflict", HttpStatus.CONFLICT, "Wallet was updated concurrently, try again"),
+
     // Cualquier otra violación de la BD (FK, CHECK...): no le decimos al usuario qué chocó
     DATA_CONFLICT("data.conflict", HttpStatus.CONFLICT, "Data conflict"),
 

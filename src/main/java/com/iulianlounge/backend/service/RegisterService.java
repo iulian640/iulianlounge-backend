@@ -23,10 +23,12 @@ public class RegisterService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final WalletService walletService;
 
-    public RegisterService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public RegisterService(UserRepository userRepository, PasswordEncoder passwordEncoder, WalletService walletService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.walletService = walletService;
     }
 
     @Transactional
@@ -58,6 +60,8 @@ public class RegisterService {
             // Solo aquí sabemos que el choque es de usuario; en otro sitio sería otra cosa
             throw new DuplicateUserException(ErrorCode.USER_ALREADY_EXISTS);
         }
+        // Misma transacción (@Transactional de register): usuario y cartera se crean juntos o ninguno
+        walletService.openWallet(user.getId());
         return user.getId();
     }
 }

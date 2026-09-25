@@ -35,11 +35,14 @@ class RegisterServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private WalletService walletService;
+
     private RegisterService registerService;
 
     @BeforeEach
     void setUp() {
-        registerService = new RegisterService(userRepository, passwordEncoder);
+        registerService = new RegisterService(userRepository, passwordEncoder, walletService);
     }
 
     @Test
@@ -71,6 +74,8 @@ class RegisterServiceTest {
         assertEquals("cursaito", saved.getValue().getUsername());
         assertEquals(Role.USER, saved.getValue().getRole());
         assertEquals(Language.ES, saved.getValue().getLocale());
+        // Cada cuenta nace con su cartera y las fichas de bienvenida (ADR-04)
+        verify(walletService).openWallet(userId);
     }
 
     @Test
