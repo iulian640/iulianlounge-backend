@@ -321,6 +321,18 @@ class AuthControllerTest {
     }
 
     @Test
+    void registerReportsTheBcryptByteLimitUnderThePasswordField() throws Exception {
+        String multibyte = "ñ".repeat(40);   // 40 caracteres pasan @Size, pero son 80 bytes
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWith("cursaito", "cursaito@lounge.com", multibyte, "es")))
+                .andExpect(status().isBadRequest())
+                // En el campo password, que es donde el frontend pinta el error
+                .andExpect(jsonPath("$.errors.password").value("validation.max_utf8_bytes"));
+    }
+
+    @Test
     void malformedJsonStillCarriesACode() throws Exception {
         // Errores que genera Spring, no nuestro código: también llevan code
         mockMvc.perform(post("/api/v1/auth/login")
