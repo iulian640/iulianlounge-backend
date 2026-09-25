@@ -3,6 +3,10 @@
 # Uso (desde la raíz del repo, en el servidor):
 #   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
 
+# Nombre fijo del proyecto: sin él, Compose usaría el de la carpeta ("deploy"), el mismo que tenía MeDeben
+# en este servidor, y un "docker compose -p deploy down" pensado para MeDeben tumbaría el lounge
+name: iulianlounge
+
 services:
   postgres:
     image: postgres:17
