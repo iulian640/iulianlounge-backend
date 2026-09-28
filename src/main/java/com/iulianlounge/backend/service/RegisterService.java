@@ -34,7 +34,6 @@ public class RegisterService {
     @Transactional
     public UUID register(RegisterRequest request) {
 
-
         String email = request.email().toLowerCase(Locale.ROOT);
 
         if (userRepository.existsByUsername(request.username())) {
@@ -56,11 +55,8 @@ public class RegisterService {
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
-            // Carrera: otro registro igual pasó los existsBy* a la vez y el UNIQUE de la BD lo frenó.
-            // Solo aquí sabemos que el choque es de usuario; en otro sitio sería otra cosa
             throw new DuplicateUserException(ErrorCode.USER_ALREADY_EXISTS);
         }
-        // Misma transacción (@Transactional de register): usuario y cartera se crean juntos o ninguno
         walletService.openWallet(user.getId());
         return user.getId();
     }

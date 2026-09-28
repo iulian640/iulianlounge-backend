@@ -40,7 +40,6 @@ import com.iulianlounge.backend.service.UserService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
-// Seguridad REAL (SecurityConfig + filtro + JwtService): aquí se prueba que la cadena protege la ruta
 @WebMvcTest(MeController.class)
 @Import({SecurityConfig.class, JwtService.class, ClockConfig.class})
 @TestPropertySource(properties = "jwt.secret=" + MeControllerTest.SECRET)
@@ -84,8 +83,6 @@ class MeControllerTest {
     @ParameterizedTest
     @ValueSource(strings = {"http://localhost:5173", "https://evil.example"})
     void noOriginGetsCorsPermission(String origin) throws Exception {
-        // ADR-08: sin CORS (mismo origen en prod, proxy de Vite en dev). Ningún origen ajeno,
-        // ni el de dev, recibe permiso: el navegador bloquea la respuesta y nadie lee el access de /refresh
         mockMvc.perform(options("/api/v1/auth/refresh")
                         .header("Origin", origin)
                         .header("Access-Control-Request-Method", "POST"))
@@ -106,7 +103,6 @@ class MeControllerTest {
 
     @Test
     void meWithExpiredAccessTokenReturns401() throws Exception {
-        // Firmado con la clave buena, iss/aud correctos, pero caducado hace un minuto
         SecretKey key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(SECRET));
         String expired = Jwts.builder()
                 .issuer("iulianlounge")

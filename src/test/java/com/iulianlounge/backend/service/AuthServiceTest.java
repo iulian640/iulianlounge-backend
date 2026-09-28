@@ -38,7 +38,6 @@ import com.iulianlounge.backend.security.RefreshTokenClaims;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    // "Ahora" fijo: así la vida que le queda al refresh se comprueba al segundo
     private static final Instant NOW = Instant.parse("2026-09-25T12:00:00Z");
 
     @Mock
@@ -75,7 +74,7 @@ class AuthServiceTest {
         assertEquals("access-token", tokens.accessToken());
         assertEquals(Duration.ofMinutes(15), tokens.accessTtl());
         assertEquals("refresh-token", tokens.refreshToken());
-        assertEquals(Duration.ofDays(7), tokens.refreshTtl());   // la cookie vive lo mismo que el token
+        assertEquals(Duration.ofDays(7), tokens.refreshTtl());
     }
 
     @Test
@@ -113,14 +112,12 @@ class AuthServiceTest {
                 .thenReturn(new RefreshTokenClaims(user.getId(), loginExpiry));
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(jwtService.generateAccessToken(user)).thenReturn("access-nuevo");
-        // El refresh nuevo se pide con la caducidad del original, no con 7 días nuevos
         when(jwtService.generateRefreshToken(user, loginExpiry)).thenReturn("refresh-nuevo");
 
         IssuedTokens tokens = authService.refresh("refresh-valido");
 
         assertEquals("access-nuevo", tokens.accessToken());
         assertEquals("refresh-nuevo", tokens.refreshToken());
-        // Y la cookie nueva caduca con él: le quedaban 5 días, no vuelve a 7
         assertEquals(Duration.ofDays(5), tokens.refreshTtl());
     }
 
@@ -142,7 +139,6 @@ class AuthServiceTest {
         assertThrows(InvalidTokenException.class, () -> authService.refresh("refresh-de-cuenta-borrada"));
     }
 
-    // Sin cookie (primera visita, o ya hizo logout) o vacía: 401 como cualquier token malo
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = " ")
@@ -153,7 +149,6 @@ class AuthServiceTest {
 
     @Test
     void refreshRejectsHugeTokenWithoutDecodingIt() {
-        // Un token real ronda 300 caracteres: no nos ponemos a decodificar megas
         String huge = "a".repeat(1025);
 
         assertThrows(InvalidTokenException.class, () -> authService.refresh(huge));
@@ -162,7 +157,6 @@ class AuthServiceTest {
 
     @Test
     void refreshStillDecodesATokenOfExactly1024Characters() {
-        // El límite es > 1024: justo 1024 sí llega a validarse
         String atLimit = "a".repeat(1024);
         when(jwtService.validateRefreshToken(atLimit)).thenThrow(new InvalidTokenException());
 

@@ -7,17 +7,16 @@ import org.junit.jupiter.api.Test;
 
 class MaxUtf8BytesValidatorTest {
 
-    // Sin anotación real: una instancia de la interfaz basta para pasarle el límite
     private final MaxUtf8BytesValidator validator = validatorFor(72);
 
     @Test
     void acceptsExactlyTheLimitInBytes() {
-        assertTrue(validator.isValid("ñ".repeat(36), null));   // 36 × 2 bytes = 72
+        assertTrue(validator.isValid("ñ".repeat(36), null));
     }
 
     @Test
     void rejectsOneByteOverTheLimit() {
-        assertFalse(validator.isValid("ñ".repeat(36) + "a", null));   // 73 bytes
+        assertFalse(validator.isValid("ñ".repeat(36) + "a", null));
     }
 
     @Test

@@ -18,8 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.jayway.jsonpath.JsonPath;
 
-// La app entera contra el Postgres real: controller → service → repository → BD, con seguridad y Flyway.
-// @Transactional: todo lo que crea el test se deshace al acabar
 @SpringBootTest(properties = "jwt.secret=dGVzdC1zZWNyZXQtcXVlLXRpZW5lLW1hcy1kZS0zMi1ieXRlcyEh")
 @AutoConfigureMockMvc
 @Transactional
@@ -30,7 +28,6 @@ class RegisterLoginWalletFlowTest {
 
     @Test
     void aNewPlayerRegistersLogsInAndFindsTheWelcomeChips() throws Exception {
-        // Nombre único: la BD de desarrollo puede tener ya otros usuarios
         String username = "flujo_" + UUID.randomUUID().toString().substring(0, 8);
 
         mockMvc.perform(post("/api/v1/auth/register")

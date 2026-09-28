@@ -57,7 +57,7 @@ class JwtAuthenticationFilterTest {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         assertEquals(claims, auth.getPrincipal());
         assertEquals("ROLE_USER", auth.getAuthorities().iterator().next().getAuthority());
-        assertNotNull(chain.getRequest());   // la petición siguió su camino
+        assertNotNull(chain.getRequest());
     }
 
     @Test

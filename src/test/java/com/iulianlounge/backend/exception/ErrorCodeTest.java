@@ -18,7 +18,6 @@ class ErrorCodeTest {
 
     @Test
     void everyKeyIsUnique() {
-        // Dos códigos con la misma clave serían indistinguibles para el frontend
         Set<String> keys = Arrays.stream(ErrorCode.values()).map(ErrorCode::key).collect(Collectors.toSet());
 
         assertEquals(ErrorCode.values().length, keys.size());
@@ -27,7 +26,6 @@ class ErrorCodeTest {
     @ParameterizedTest
     @EnumSource(ErrorCode.class)
     void keyIsAnI18nKeyAndDetailIsNotBlank(ErrorCode code) {
-        // Formato de clave de vue-i18n: grupo.nombre en minúsculas
         assertTrue(code.key().matches("[a-z]+\\.[a-z_]+"), code.key());
         assertFalse(code.detail().isBlank());
     }

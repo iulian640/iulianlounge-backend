@@ -14,8 +14,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-// ADR-04: una línea del ledger, la fuente de verdad del saldo. Append-only: se inserta y no se toca nunca.
-// @Immutable hace que Hibernate ignore cualquier cambio: aunque alguien llamara a un setter, no habría UPDATE
 @Entity
 @Immutable
 @Table(name = "token_transaction")
@@ -28,14 +26,12 @@ public class TokenTransaction {
     @Column(nullable = false)
     private UUID walletId;
 
-    // Con signo: positivo entra, negativo sale
     private long amount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TransactionType type;
 
-    // Saldo justo después de este movimiento: el historial se lee sin recalcular nada
     private long balanceAfter;
 
     private String idempotencyKey;
@@ -44,7 +40,6 @@ public class TokenTransaction {
     private Instant createdAt;
 
     protected TokenTransaction() {
-        // Para JPA
     }
 
     public TokenTransaction(UUID walletId, long amount, TransactionType type, long balanceAfter,

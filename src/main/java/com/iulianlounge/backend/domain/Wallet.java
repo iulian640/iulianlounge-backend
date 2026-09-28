@@ -11,8 +11,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-// ADR-04: el saldo materializado, una caché del ledger para leerlo en una fila.
-// Solo WalletService lo cambia, y siempre junto a un movimiento en token_transaction
 @Entity
 @Table(name = "wallet")
 public class Wallet {
@@ -24,10 +22,8 @@ public class Wallet {
     @Column(nullable = false, updatable = false, unique = true)
     private UUID userId;
 
-    // ADR-09: fichas como long, nunca double
     private long balance;
 
-    // Bloqueo optimista: el UPDATE lleva "WHERE version = ?"; si otro escribió antes, falla
     @Version
     private Long version;
 
@@ -35,7 +31,6 @@ public class Wallet {
     private Instant createdAt;
 
     protected Wallet() {
-        // Para JPA
     }
 
     public Wallet(UUID userId, Instant createdAt) {

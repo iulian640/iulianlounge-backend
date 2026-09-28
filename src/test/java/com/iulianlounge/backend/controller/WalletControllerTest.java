@@ -36,7 +36,6 @@ import com.iulianlounge.backend.exception.WalletNotFoundException;
 import com.iulianlounge.backend.security.JwtService;
 import com.iulianlounge.backend.service.WalletService;
 
-// Seguridad REAL, como MeControllerTest: la cartera solo se ve con un access token válido
 @WebMvcTest(WalletController.class)
 @Import({SecurityConfig.class, JwtService.class, ClockConfig.class})
 @TestPropertySource(properties = "jwt.secret=" + MeControllerTest.SECRET)
@@ -107,7 +106,6 @@ class WalletControllerTest {
 
     @Test
     void pageSizeIsCappedAndNegativePagesStartAtZero() throws Exception {
-        // ?size=5000 no puede convertirse en una consulta de 5000 filas
         when(walletService.getTransactions(eq(user.getId()), any())).thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/api/v1/wallet/transactions?page=-3&size=5000").header("Authorization", bearer))

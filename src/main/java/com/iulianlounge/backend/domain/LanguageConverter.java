@@ -3,7 +3,6 @@ package com.iulianlounge.backend.domain;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 
-// @Enumerated(STRING) guardaría "ES"; la columna ya tiene "es" y el CHECK de V3 espera minúsculas
 @Converter(autoApply = true)
 public class LanguageConverter implements AttributeConverter<Language, String> {
 

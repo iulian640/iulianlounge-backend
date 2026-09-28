@@ -47,14 +47,12 @@ public class AuthController {
         return withRefreshCookie(authService.login(request));
     }
 
-    // ADR-08: el refresh llega en la cookie, no en el cuerpo. Sin cookie → null → el service responde 401
     @PostMapping("/refresh")
     public ResponseEntity<AccessTokenResponse> refresh(
             @CookieValue(name = RefreshCookies.NAME, required = false) String refreshToken) {
         return withRefreshCookie(authService.refresh(refreshToken));
     }
 
-    // Público: con el access ya caducado también tiene que poder salir. Idempotente
     @PostMapping("/logout")
     public ResponseEntity<Void> logout() {
         return ResponseEntity.noContent()
@@ -62,7 +60,6 @@ public class AuthController {
                 .build();
     }
 
-    // El access va al cuerpo (el frontend lo guarda en memoria); el refresh, a la cookie HttpOnly
     private ResponseEntity<AccessTokenResponse> withRefreshCookie(IssuedTokens tokens) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE,

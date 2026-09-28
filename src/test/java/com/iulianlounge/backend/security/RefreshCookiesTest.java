@@ -25,7 +25,6 @@ class RefreshCookiesTest {
 
     @Test
     void createNeverProducesANegativeMaxAge() {
-        // Max-Age negativo = cookie de sesión que vive hasta cerrar el navegador: justo lo contrario
         ResponseCookie cookie = RefreshCookies.create("refresh-token", Duration.ofSeconds(-5));
 
         assertEquals(Duration.ZERO, cookie.getMaxAge());
@@ -39,7 +38,6 @@ class RefreshCookiesTest {
         assertEquals("", cookie.getValue());
         assertEquals("/api/v1/auth", cookie.getPath());
         assertEquals(Duration.ZERO, cookie.getMaxAge());
-        // Mismos atributos que la original: Chrome no deja que una cookie sin Secure pise a una Secure
         assertTrue(cookie.isHttpOnly());
         assertTrue(cookie.isSecure());
         assertEquals("Strict", cookie.getSameSite());

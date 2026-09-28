@@ -25,7 +25,6 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
-// ADR-08: access 15 min (sub, role) y refresh 7 días (type=refresh), HMAC-SHA256, sin BD
 @Service
 public class JwtService {
 
@@ -35,21 +34,15 @@ public class JwtService {
     private static final String TYPE_CLAIM = "type";
     private static final String ACCESS_TYPE = "access";
     private static final String REFRESH_TYPE = "refresh";
-    // Si JWT_SECRET se reutilizara en otro entorno o servicio, sus tokens no valdrían aquí
     static final String ISSUER = "iulianlounge";
     static final String AUDIENCE = "iulianlounge-api";
-    // Roles que el filtro puede convertir en ROLE_*: los del enum; cualquier otro (o ninguno) invalida el token
     private static final Set<String> ALLOWED_ROLES =
             Arrays.stream(Role.values()).map(Role::name).collect(Collectors.toUnmodifiableSet());
 
     private final SecretKey key;
     private final Clock clock;
 
-    // Mismo bean Clock que AuthService: la cookie y el exp del token salen del mismo reloj.
-    // Los tests pasan uno fijo para probar la caducidad sin esperar 15 minutos
     public JwtService(@Value("${jwt.secret}") String secret, Clock clock) {
-        // JWT_SECRET en base64 (openssl rand -base64 32): así la clave son bytes aleatorios de verdad, no texto tecleable.
-        // No arranca si no es base64 (DecodingException) o si decodifica a menos de 32 bytes (WeakKeyException)
         this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
         this.clock = clock;
     }
@@ -72,7 +65,6 @@ public class JwtService {
         return generateRefreshToken(user, clock.instant().plus(REFRESH_TTL));
     }
 
-    // Rotación: el refresh nuevo hereda la caducidad del anterior, así la sesión muere a los 7 días del login
     public String generateRefreshToken(User user, Instant expiresAt) {
         Instant now = clock.instant();
         return Jwts.builder()
@@ -106,7 +98,6 @@ public class JwtService {
                 claims.getExpiration().toInstant()));
     }
 
-    // Firma buena pero claims rotos (sub ausente o no-UUID): 401, no 500
     private static <T> T readOrReject(Supplier<T> read) {
         try {
             return read.get();
@@ -115,7 +106,6 @@ public class JwtService {
         }
     }
 
-    // Firma, caducidad y tipo: un refresh no vale como access ni al revés
     private Claims parse(String token, String expectedType) {
         Claims claims;
         try {

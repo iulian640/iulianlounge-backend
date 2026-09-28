@@ -20,8 +20,6 @@ import com.iulianlounge.backend.domain.Language;
 import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 
-// Contra el Postgres real con las migraciones de Flyway: prueba el mapeo JPA y las restricciones de la BD.
-// Cada test hace rollback al acabar
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = Replace.NONE)
 class UserRepositoryTest {
@@ -34,12 +32,10 @@ class UserRepositoryTest {
 
     @Test
     void savesAndReadsBackEveryColumnFromTheDatabase() {
-        // Postgres guarda microsegundos; Java da nanosegundos. Truncado, el Instant sobrevive al viaje
         Instant createdAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
         User user = newUser("cursaito", "cursaito@lounge.com");
         user.setCreatedAt(createdAt);
         userRepository.saveAndFlush(user);
-        // Sin clear(), findById devolvería el mismo objeto de la caché de Hibernate sin ir a la BD
         entityManager.clear();
 
         User retrieved = userRepository.findById(user.getId()).orElseThrow();
@@ -63,7 +59,6 @@ class UserRepositoryTest {
 
     @Test
     void emailIsUniqueIgnoringCase() {
-        // V2: índice único sobre lower(email)
         userRepository.saveAndFlush(newUser("cursaito", "cursaito@lounge.com"));
 
         assertThrows(DataIntegrityViolationException.class,
@@ -72,7 +67,6 @@ class UserRepositoryTest {
 
     @Test
     void databaseRejectsARoleOutsideTheEnum() {
-        // V3: aunque alguien se salte el enum de Java (SQL a mano, otro servicio), la BD dice que no
         User user = userRepository.saveAndFlush(newUser("cursaito", "cursaito@lounge.com"));
 
         assertThrows(Exception.class, () -> entityManager.getEntityManager()

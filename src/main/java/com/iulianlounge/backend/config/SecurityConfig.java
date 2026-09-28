@@ -27,9 +27,6 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // Sin CORS a propósito (ADR-08): en prod todo va por el mismo origen (Caddy) y en dev por el proxy de Vite.
-    // Si algún día hace falta, NUNCA allowCredentials: cualquier origen permitido podría llamar a /refresh
-    // con la cookie y leerse el access token
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService,
             @Value("${auth.rate-limit.max-per-minute:20}") int maxAuthAttemptsPerMinute,
@@ -39,11 +36,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(new ProblemDetailAuthenticationEntryPoint()))
                 .authorizeHttpRequests(auth -> auth
-                        // Rutas exactas: una ruta nueva bajo /auth nace privada, no pública por accidente
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout").permitAll()
-                        // /error abierto: si no, cualquier 500 o 404 llega al cliente disfrazado de 401
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(new AuthRateLimitFilter(maxAuthAttemptsPerMinute, clock.getIfAvailable(Clock::systemUTC)),

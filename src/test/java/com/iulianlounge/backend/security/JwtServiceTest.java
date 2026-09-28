@@ -57,7 +57,6 @@ class JwtServiceTest {
 
     @Test
     void accessTokenDoesNotCarryTheUsername() {
-        // El payload de un JWT es base64 legible por cualquiera: nada de datos personales que no hagan falta
         String payload = new String(Base64.getUrlDecoder().decode(jwtService.generateAccessToken(user).split("\\.")[1]),
                 StandardCharsets.UTF_8);
 
@@ -76,12 +75,10 @@ class JwtServiceTest {
     void rotatedRefreshTokenKeepsTheOriginalExpiry() {
         String fromLogin = jwtService.generateRefreshToken(user);
 
-        // Día 6: se rota el refresh
         JwtService daySix = new JwtService(SECRET, Clock.fixed(NOW.plus(Duration.ofDays(6)), ZoneOffset.UTC));
         RefreshTokenClaims claims = daySix.validateRefreshToken(fromLogin);
         String rotated = daySix.generateRefreshToken(user, claims.expiresAt());
 
-        // Día 7 + 1 minuto: el rotado ya no vale, la sesión no se ha alargado
         JwtService afterSevenDays = new JwtService(SECRET,
                 Clock.fixed(NOW.plus(JwtService.REFRESH_TTL).plusSeconds(60), ZoneOffset.UTC));
         assertThrows(InvalidTokenException.class, () -> afterSevenDays.validateRefreshToken(rotated));
@@ -225,7 +222,6 @@ class JwtServiceTest {
 
     @Test
     void tokensAreSignedWithHs256EvenWithALongSecret() {
-        // Un secreto de 64 bytes haría que jjwt eligiera HS512 si no lo fijáramos
         byte[] longKey = "x".repeat(64).getBytes(StandardCharsets.UTF_8);
         JwtService service = new JwtService(Base64.getEncoder().encodeToString(longKey), Clock.fixed(NOW, ZoneOffset.UTC));
         SecretKey key = Keys.hmacShaKeyFor(longKey);
@@ -240,13 +236,11 @@ class JwtServiceTest {
 
     @Test
     void shortSecretIsRefusedAtStartup() {
-        // "corto" en base64: 5 bytes, muy lejos de los 32 que pide HS256
         assertThrows(WeakKeyException.class, () -> new JwtService("Y29ydG8=", Clock.systemUTC()));
     }
 
     @Test
     void secretThatIsNotBase64IsRefusedAtStartup() {
-        // JWT_SECRET se genera con `openssl rand -base64 32`; un texto plano es un error de configuración
         assertThrows(DecodingException.class,
                 () -> new JwtService("esto no es base64 y tiene más de 32 bytes!!", Clock.systemUTC()));
     }

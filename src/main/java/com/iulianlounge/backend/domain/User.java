@@ -27,7 +27,7 @@ public class User implements Persistable<UUID> {
     private String passwordHash;
     @Enumerated(EnumType.STRING)
     private Role role;
-    private Language locale;   // LanguageConverter (autoApply): "es"/"en" en la columna
+    private Language locale;
     private Instant createdAt;
     private Instant lastSeenAt;
     @Transient

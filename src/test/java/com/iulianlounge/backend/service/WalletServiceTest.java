@@ -55,7 +55,6 @@ class WalletServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Sin transacción real: aquí se prueba la lógica, la atomicidad la prueba la BD
         walletService = new WalletService(walletRepository, transactionRepository,
                 TransactionOperations.withoutTransaction(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
@@ -128,7 +127,6 @@ class WalletServiceTest {
     @ParameterizedTest
     @ValueSource(longs = {0, -5})
     void amountMustBePositive(long amount) {
-        // El signo lo pone credit/debit; quien llama siempre pasa una cantidad positiva
         assertThrows(IllegalArgumentException.class,
                 () -> walletService.credit(USER_ID, amount, TransactionType.WELCOME_BONUS, null));
         assertThrows(IllegalArgumentException.class,
@@ -137,7 +135,6 @@ class WalletServiceTest {
 
     @Test
     void repeatedIdempotencyKeyReturnsTheOriginalMovementWithoutApplyingItAgain() {
-        // Doble clic: la segunda petición con la misma clave no vuelve a sumar
         Wallet wallet = walletWith(80);
         TokenTransaction original = new TokenTransaction(WALLET_ID, 30, TransactionType.WELCOME_BONUS, 80, "clave-1", NOW);
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(wallet));
@@ -152,7 +149,6 @@ class WalletServiceTest {
 
     @Test
     void sameIdempotencyKeyWithADifferentAmountIsRejected() {
-        // Reusar una clave para otra operación es un bug del cliente: no se tapa devolviendo la vieja
         TokenTransaction original = new TokenTransaction(WALLET_ID, 30, TransactionType.WELCOME_BONUS, 80, "clave-1", NOW);
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(80)));
         when(transactionRepository.findByWalletIdAndIdempotencyKey(WALLET_ID, "clave-1")).thenReturn(Optional.of(original));
@@ -163,7 +159,6 @@ class WalletServiceTest {
 
     @Test
     void creditRefusesToJoinSomeoneElsesTransaction() {
-        // El reintento necesita una transacción propia; dentro de otra, releería la cartera vieja (ADR-04)
         TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
             assertThrows(IllegalStateException.class,
@@ -175,7 +170,6 @@ class WalletServiceTest {
 
     @Test
     void retriesOnceWhenAnotherWriteGotThereFirst() {
-        // Primera vuelta: otra transacción cambió la cartera → @Version falla. Segunda: relee y aplica
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)), Optional.of(walletWith(60)));
         when(walletRepository.saveAndFlush(any()))
                 .thenThrow(new ObjectOptimisticLockingFailureException(Wallet.class, WALLET_ID))
@@ -184,7 +178,7 @@ class WalletServiceTest {
 
         TokenTransaction movement = walletService.credit(USER_ID, 10, TransactionType.WELCOME_BONUS, null);
 
-        assertEquals(70, movement.getBalanceAfter());   // sobre el saldo releído, no el viejo
+        assertEquals(70, movement.getBalanceAfter());
         verify(walletRepository, times(2)).findByUserId(USER_ID);
     }
 
@@ -219,7 +213,6 @@ class WalletServiceTest {
         return wallet;
     }
 
-    // El id lo pone JPA al guardar; en un test unitario no hay JPA
     private static Wallet withId(Wallet wallet) {
         ReflectionTestUtils.setField(wallet, "id", WALLET_ID);
         return wallet;

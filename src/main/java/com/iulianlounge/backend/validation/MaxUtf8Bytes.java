@@ -11,8 +11,6 @@ import java.lang.annotation.Target;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
-// @Size cuenta caracteres; BCrypt cuenta bytes y rechaza más de 72 (una ñ o un emoji ocupan varios).
-// Va en el propio campo para que el error salga bajo "password" y no bajo un método auxiliar
 @Target({FIELD, PARAMETER, RECORD_COMPONENT})
 @Retention(RUNTIME)
 @Constraint(validatedBy = MaxUtf8BytesValidator.class)

@@ -47,11 +47,10 @@ class AuthControllerTest {
     private AuthService authService;
 
     @MockitoBean
-    private JwtService jwtService;   // SecurityConfig lo necesita para montar el filtro
+    private JwtService jwtService;
 
     @Test
     void registerReturns201WithUserId() throws Exception {
-        // Arrange: el mock devolverá este UUID cuando le llamen
         UUID userId = UUID.randomUUID();
         when(registerService.register(any())).thenReturn(userId);
 
@@ -59,7 +58,6 @@ class AuthControllerTest {
                 {"username":"cursaito","email":"cursaito@lounge.com","password":"12345678","locale":"es"}
                 """;
 
-        // Act + Assert: lanzar el POST y comprobar la respuesta
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -69,7 +67,6 @@ class AuthControllerTest {
 
     @Test
     void registerReturns409WhenUserIsDuplicated() throws Exception {
-        // Arrange: el mock lanza la excepción como si el email ya existiera
         when(registerService.register(any()))
                 .thenThrow(new DuplicateUserException(ErrorCode.USER_EMAIL_TAKEN));
 
@@ -77,20 +74,16 @@ class AuthControllerTest {
                 {"username":"cursaito","email":"cursaito@lounge.com","password":"12345678","locale":"es"}
                 """;
 
-        // Act + Assert: el handler convierte la excepción en 409 ProblemDetail
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isConflict())
-                // ADR-06: el frontend lee code; detail es inglés y solo para depurar
                 .andExpect(jsonPath("$.code").value("user.email_taken"))
                 .andExpect(jsonPath("$.detail").value("Email already in use"));
     }
 
     @Test
     void anyOtherDatabaseConflictIsAGenericConflictNotUserAlreadyExists() throws Exception {
-        // La carrera del registro la traduce el RegisterService; aquí llega cualquier otra (FK, CHECK...)
-        // y no debe decirle al usuario "ya existe"
         when(registerService.register(any()))
                 .thenThrow(new DataIntegrityViolationException("violates foreign key constraint"));
 
@@ -116,13 +109,11 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("internal.error"))
-                // El mensaje interno va al log, nunca al cliente
                 .andExpect(jsonPath("$.detail").value("Internal error"));
     }
 
     @Test
     void emptyUsernameAlwaysReportsNotBlankFirst() throws Exception {
-        // "" falla @NotBlank, @Size y @Pattern a la vez: la clave tiene que ser siempre la misma
         for (int i = 0; i < 20; i++) {
             mockMvc.perform(post("/api/v1/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -144,12 +135,10 @@ class AuthControllerTest {
 
     @Test
     void registerReturns400WhenBodyIsInvalid() throws Exception {
-        // Arrange: email sin @ y contraseña de menos de 8 caracteres
         String body = """
                 {"username":"cursaito","email":"no-es-un-email","password":"123","locale":"es"}
                 """;
 
-        // Act + Assert: @Valid lo corta antes de llegar al service
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -160,7 +149,7 @@ class AuthControllerTest {
 
     @Test
     void registerReturns400WhenUsernameIsTooLong() throws Exception {
-        String longUsername = "a".repeat(51);   // la columna es VARCHAR(50)
+        String longUsername = "a".repeat(51);
 
         expectBadRequest(bodyWith(longUsername, "cursaito@lounge.com", "12345678", "es"));
     }
@@ -172,14 +161,14 @@ class AuthControllerTest {
 
     @Test
     void registerReturns400WhenPasswordIsTooLong() throws Exception {
-        String longPassword = "p".repeat(65);   // BCrypt no admite más de 72 bytes
+        String longPassword = "p".repeat(65);
 
         expectBadRequest(bodyWith("cursaito", "cursaito@lounge.com", longPassword, "es"));
     }
 
     @Test
     void registerReturns400WhenPasswordExceedsBcrypt72Bytes() throws Exception {
-        String multibyte = "ñ".repeat(40);   // 40 caracteres pasan @Size, pero son 80 bytes
+        String multibyte = "ñ".repeat(40);
 
         expectBadRequest(bodyWith("cursaito", "cursaito@lounge.com", multibyte, "es"));
     }
@@ -209,7 +198,6 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
                 .andExpect(jsonPath("$.expiresIn").value(900))
-                // ADR-08: el refresh NUNCA en el cuerpo, donde el JavaScript podría leerlo
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(cookie().value("refresh_token", "refresh-token"))
                 .andExpect(cookie().httpOnly("refresh_token", true))
@@ -249,7 +237,6 @@ class AuthControllerTest {
         when(authService.refresh("refresh-valido"))
                 .thenReturn(new IssuedTokens("access-nuevo", Duration.ofMinutes(15), "refresh-nuevo", Duration.ofDays(5)));
 
-        // Sin cuerpo: el navegador adjunta la cookie solo
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refresh_token", "refresh-valido")))
                 .andExpect(status().isOk())
@@ -258,7 +245,6 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(cookie().value("refresh_token", "refresh-nuevo"))
                 .andExpect(cookie().httpOnly("refresh_token", true))
-                // Hereda lo que le quedaba al del login: la sesión no se alarga
                 .andExpect(cookie().maxAge("refresh_token", (int) Duration.ofDays(5).toSeconds()));
     }
 
@@ -270,14 +256,12 @@ class AuthControllerTest {
                         .cookie(new Cookie("refresh_token", "caducado")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("auth.invalid_token"))
-                // La cookie muerta se borra: el navegador deja de mandarla en cada carga
                 .andExpect(cookie().value("refresh_token", ""))
                 .andExpect(cookie().maxAge("refresh_token", 0));
     }
 
     @Test
     void refreshWithoutCookieReachesTheServiceAsNull() throws Exception {
-        // El 401 lo decide el service; el controller no se inventa un 400
         when(authService.refresh(null)).thenThrow(new InvalidTokenException());
 
         mockMvc.perform(post("/api/v1/auth/refresh"))
@@ -291,7 +275,6 @@ class AuthControllerTest {
                 .andExpect(cookie().value("refresh_token", ""))
                 .andExpect(cookie().path("refresh_token", "/api/v1/auth"))
                 .andExpect(cookie().maxAge("refresh_token", 0))
-                // Mismos atributos que la original, o el navegador no la reconoce como la misma
                 .andExpect(cookie().httpOnly("refresh_token", true))
                 .andExpect(cookie().secure("refresh_token", true))
                 .andExpect(cookie().sameSite("refresh_token", "Strict"));
@@ -299,7 +282,6 @@ class AuthControllerTest {
 
     @Test
     void logoutWorksWithAnExpiredAccessToken() throws Exception {
-        // Público a propósito: con el access caducado también tiene que poder salir
         when(jwtService.validateAccessToken("caducado")).thenThrow(new InvalidTokenException());
 
         mockMvc.perform(post("/api/v1/auth/logout")
@@ -314,7 +296,6 @@ class AuthControllerTest {
                         .content(bodyWith("cursaito", "no-es-un-email", "123", "es")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("validation.failed"))
-                // Claves, no mensajes del validador (cambian con el Accept-Language)
                 .andExpect(jsonPath("$.errors.email").value("validation.email"))
                 .andExpect(jsonPath("$.errors.password").value("validation.size"))
                 .andExpect(jsonPath("$.errors.username").doesNotExist());
@@ -322,19 +303,17 @@ class AuthControllerTest {
 
     @Test
     void registerReportsTheBcryptByteLimitUnderThePasswordField() throws Exception {
-        String multibyte = "ñ".repeat(40);   // 40 caracteres pasan @Size, pero son 80 bytes
+        String multibyte = "ñ".repeat(40);
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bodyWith("cursaito", "cursaito@lounge.com", multibyte, "es")))
                 .andExpect(status().isBadRequest())
-                // En el campo password, que es donde el frontend pinta el error
                 .andExpect(jsonPath("$.errors.password").value("validation.max_utf8_bytes"));
     }
 
     @Test
     void malformedJsonStillCarriesACode() throws Exception {
-        // Errores que genera Spring, no nuestro código: también llevan code
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{esto no es json"))
@@ -344,7 +323,6 @@ class AuthControllerTest {
 
     @Test
     void unknownAuthRouteIsPrivateNotPublic() throws Exception {
-        // Antes /api/v1/auth/** era todo público; ahora solo register, login, refresh y logout
         mockMvc.perform(post("/api/v1/auth/no-existe"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("auth.required"));

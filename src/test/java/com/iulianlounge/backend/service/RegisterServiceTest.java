@@ -47,7 +47,6 @@ class RegisterServiceTest {
 
     @Test
     void registerTurnsADatabaseDuplicateIntoUserAlreadyExists() {
-        // Carrera: dos registros iguales pasan los existsBy* y el UNIQUE de la BD frena al segundo
         when(passwordEncoder.encode(any())).thenReturn("hash");
         when(userRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
@@ -58,14 +57,11 @@ class RegisterServiceTest {
 
     @Test
     void registerSavesUserWithHashedPasswordAndLowercaseEmail() {
-        // Arrange
         RegisterRequest request = new RegisterRequest("cursaito", "Cursaito@Lounge.COM", "12345678", "es");
         when(passwordEncoder.encode("12345678")).thenReturn("hash-de-mentira");
 
-        // Act
         UUID userId = registerService.register(request);
 
-        // Assert: capturamos el User que se guardó para mirarlo por dentro
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
         verify(userRepository).saveAndFlush(saved.capture());
         assertEquals(userId, saved.getValue().getId());
@@ -74,7 +70,6 @@ class RegisterServiceTest {
         assertEquals("cursaito", saved.getValue().getUsername());
         assertEquals(Role.USER, saved.getValue().getRole());
         assertEquals(Language.ES, saved.getValue().getLocale());
-        // Cada cuenta nace con su cartera y las fichas de bienvenida (ADR-04)
         verify(walletService).openWallet(userId);
     }
 

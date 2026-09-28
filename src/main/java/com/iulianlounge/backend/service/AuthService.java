@@ -20,7 +20,6 @@ import com.iulianlounge.backend.security.RefreshTokenClaims;
 @Service
 public class AuthService {
 
-    // Un token real ronda 300 caracteres: el tope evita que nos manden megas a decodificar
     private static final int MAX_REFRESH_TOKEN_LENGTH = 1024;
 
     private final UserRepository userRepository;
@@ -51,23 +50,18 @@ public class AuthService {
         return issue(user, now, now.plus(JwtService.REFRESH_TTL));
     }
 
-    // Stateless (ADR-08): el refresh viejo sigue valiendo hasta que caduca; no hay lista negra en BD.
-    // El nuevo hereda esa caducidad, así ninguna sesión pasa de 7 días desde el login.
     public IssuedTokens refresh(String refreshToken) {
-        // Sin cookie (null) o con basura enorme: 401 como cualquier token malo, sin decodificar nada
         if (refreshToken == null || refreshToken.isBlank() || refreshToken.length() > MAX_REFRESH_TOKEN_LENGTH) {
             throw new InvalidTokenException();
         }
         RefreshTokenClaims claims = jwtService.validateRefreshToken(refreshToken);
 
-        // El token puede ser válido y la cuenta ya no existir
         User user = userRepository.findById(claims.userId())
                 .orElseThrow(() -> new InvalidTokenException());
 
         return issue(user, clock.instant(), claims.expiresAt());
     }
 
-    // Un solo "ahora" por petición: la vida de la cookie se calcula con el mismo instante que el token
     private IssuedTokens issue(User user, Instant now, Instant refreshExpiresAt) {
         return new IssuedTokens(
                 jwtService.generateAccessToken(user),

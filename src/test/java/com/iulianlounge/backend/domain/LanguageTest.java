@@ -15,7 +15,6 @@ class LanguageTest {
 
     @Test
     void fromCodeRejectsAnUnsupportedCode() {
-        // RegisterRequest ya lo filtra con @Pattern: si llega aquí es un bug, que falle alto
         assertThrows(IllegalArgumentException.class, () -> Language.fromCode("fr"));
     }
 

@@ -28,7 +28,6 @@ import com.iulianlounge.backend.domain.TransactionType;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.domain.Wallet;
 
-// Contra el Postgres real: prueba que las defensas de la V4 están en la BD, no solo en Java
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = Replace.NONE)
 class WalletRepositoryTest {
@@ -66,7 +65,6 @@ class WalletRepositoryTest {
 
     @Test
     void databaseRejectsANegativeBalance() {
-        // CHECK (balance >= 0): la última defensa si Java dejara pasar un débito de más
         assertThrows(PersistenceException.class, () -> entityManager.getEntityManager()
                 .createNativeQuery("UPDATE wallet SET balance = -1 WHERE id = :id")
                 .setParameter("id", wallet.getId())
@@ -75,7 +73,6 @@ class WalletRepositoryTest {
 
     @Test
     void aWalletWithMovementsCannotBeDeleted() {
-        // Append-only (ADR-04): borrar la cartera no puede llevarse el ledger por delante
         transactionRepository.saveAndFlush(welcome(wallet, null));
 
         assertThrows(PersistenceException.class, () -> entityManager.getEntityManager()
@@ -86,7 +83,6 @@ class WalletRepositoryTest {
 
     @Test
     void staleWalletIsRejectedByTheVersion() {
-        // Otra transacción cambió la cartera después de que la leyéramos: @Version lo detecta al guardar
         entityManager.getEntityManager()
                 .createNativeQuery("UPDATE wallet SET version = version + 1 WHERE id = :id")
                 .setParameter("id", wallet.getId())
