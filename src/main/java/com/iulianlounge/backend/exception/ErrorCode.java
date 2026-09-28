@@ -12,6 +12,7 @@ public enum ErrorCode {
     AUTH_INVALID_CREDENTIALS("auth.invalid_credentials", HttpStatus.UNAUTHORIZED, "Invalid credentials"),
     // Uno solo para todo token rechazado: no revela si la firma era buena
     AUTH_INVALID_TOKEN("auth.invalid_token", HttpStatus.UNAUTHORIZED, "Invalid or expired token"),
+    AUTH_TOO_MANY_REQUESTS("auth.too_many_requests", HttpStatus.TOO_MANY_REQUESTS, "Too many attempts, try again later"),
 
     USER_USERNAME_TAKEN("user.username_taken", HttpStatus.CONFLICT, "Username already in use"),
     USER_EMAIL_TAKEN("user.email_taken", HttpStatus.CONFLICT, "Email already in use"),

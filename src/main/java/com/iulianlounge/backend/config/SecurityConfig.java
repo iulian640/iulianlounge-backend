@@ -1,5 +1,9 @@
 package com.iulianlounge.backend.config;
 
+import java.time.Clock;
+
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -10,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import com.iulianlounge.backend.security.AuthRateLimitFilter;
 import com.iulianlounge.backend.security.JwtAuthenticationFilter;
 import com.iulianlounge.backend.security.JwtService;
 import com.iulianlounge.backend.security.ProblemDetailAuthenticationEntryPoint;
@@ -26,7 +31,9 @@ public class SecurityConfig {
     // Si algún día hace falta, NUNCA allowCredentials: cualquier origen permitido podría llamar a /refresh
     // con la cookie y leerse el access token
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService,
+            @Value("${auth.rate-limit.max-per-minute:20}") int maxAuthAttemptsPerMinute,
+            ObjectProvider<Clock> clock) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -39,6 +46,8 @@ public class SecurityConfig {
                         // /error abierto: si no, cualquier 500 o 404 llega al cliente disfrazado de 401
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .anyRequest().authenticated())
+                .addFilterBefore(new AuthRateLimitFilter(maxAuthAttemptsPerMinute, clock.getIfAvailable(Clock::systemUTC)),
+                        UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

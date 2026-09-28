@@ -33,7 +33,7 @@ import com.iulianlounge.backend.service.RegisterService;
 
 import jakarta.servlet.http.Cookie;
 
-@WebMvcTest(AuthController.class)
+@WebMvcTest(controllers = AuthController.class, properties = "auth.rate-limit.max-per-minute=1000")
 @Import(SecurityConfig.class)
 class AuthControllerTest {
 
