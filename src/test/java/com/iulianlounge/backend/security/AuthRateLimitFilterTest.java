@@ -87,6 +87,42 @@ class AuthRateLimitFilterTest {
         assertEquals(200, send("POST", "/api/v1/auth/register", "10.0.0.1").getStatus());
     }
 
+    @Test
+    void percentEncodedPathCountsAsTheSameEndpoint() throws Exception {
+        for (int i = 0; i < LIMIT; i++) {
+            send("POST", LOGIN, "10.0.0.1");
+        }
+
+        assertEquals(429, send("POST", "/api/v1/auth/%6cogin", "10.0.0.1").getStatus());
+    }
+
+    @Test
+    void whenTrackingIsFullNewIpsAreRejectedInsteadOfGrowingTheMap() throws Exception {
+        AuthRateLimitFilter small = new AuthRateLimitFilter(LIMIT, clock, 2);
+        MockHttpServletResponse first = new MockHttpServletResponse();
+        MockHttpServletResponse second = new MockHttpServletResponse();
+        MockHttpServletResponse third = new MockHttpServletResponse();
+
+        small.doFilter(request("POST", LOGIN, "10.0.0.1"), first, new MockFilterChain());
+        small.doFilter(request("POST", LOGIN, "10.0.0.2"), second, new MockFilterChain());
+        small.doFilter(request("POST", LOGIN, "10.0.0.3"), third, new MockFilterChain());
+
+        assertEquals(200, second.getStatus());
+        assertEquals(429, third.getStatus());
+    }
+
+    @Test
+    void expiredEntriesFreeRoomForNewIps() throws Exception {
+        AuthRateLimitFilter small = new AuthRateLimitFilter(LIMIT, clock, 1);
+        small.doFilter(request("POST", LOGIN, "10.0.0.1"), new MockHttpServletResponse(), new MockFilterChain());
+
+        clock.advance(Duration.ofSeconds(61));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        small.doFilter(request("POST", LOGIN, "10.0.0.2"), response, new MockFilterChain());
+
+        assertEquals(200, response.getStatus());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = { "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/wallet" })
     void otherPathsAreNotLimited(String path) throws Exception {

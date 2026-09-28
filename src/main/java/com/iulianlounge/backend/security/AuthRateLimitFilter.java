@@ -14,6 +14,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 import com.iulianlounge.backend.exception.ErrorCode;
 
@@ -25,7 +26,8 @@ import jakarta.servlet.http.HttpServletResponse;
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private static final Duration WINDOW = Duration.ofMinutes(1);
-    private static final int MAX_TRACKED_KEYS = 10_000;
+    private static final int DEFAULT_MAX_TRACKED_KEYS = 10_000;
+    private static final Duration SWEEP_INTERVAL = Duration.ofSeconds(1);
     private static final Set<String> LIMITED_PATHS = Set.of("/api/v1/auth/login", "/api/v1/auth/register");
     private static final String BODY = """
             {"type":"about:blank","title":"Too Many Requests","status":429,"detail":"%s","code":"%s"}"""
@@ -33,24 +35,34 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private final int maxRequestsPerWindow;
     private final Clock clock;
+    private final int maxTrackedKeys;
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
+    private volatile Instant lastSweep = Instant.MIN;
 
     public AuthRateLimitFilter(int maxRequestsPerWindow, Clock clock) {
+        this(maxRequestsPerWindow, clock, DEFAULT_MAX_TRACKED_KEYS);
+    }
+
+    AuthRateLimitFilter(int maxRequestsPerWindow, Clock clock, int maxTrackedKeys) {
         this.maxRequestsPerWindow = maxRequestsPerWindow;
         this.clock = clock;
+        this.maxTrackedKeys = maxTrackedKeys;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !HttpMethod.POST.matches(request.getMethod()) || !LIMITED_PATHS.contains(request.getRequestURI());
+        return !HttpMethod.POST.matches(request.getMethod()) || !LIMITED_PATHS.contains(pathOf(request));
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         Instant now = clock.instant();
-        evictExpiredIfFull(now);
-        String key = request.getRemoteAddr() + " " + request.getRequestURI();
+        String key = request.getRemoteAddr() + " " + pathOf(request);
+        if (!windows.containsKey(key) && isFull(now)) {
+            reject(response);
+            return;
+        }
         Window window = windows.compute(key, (k, current) -> current == null || current.isExpired(now)
                 ? new Window(now, 1)
                 : current.increment());
@@ -62,10 +74,19 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    private void evictExpiredIfFull(Instant now) {
-        if (windows.size() >= MAX_TRACKED_KEYS) {
+    private boolean isFull(Instant now) {
+        if (windows.size() < maxTrackedKeys) {
+            return false;
+        }
+        if (!now.isBefore(lastSweep.plus(SWEEP_INTERVAL))) {
+            lastSweep = now;
             windows.values().removeIf(window -> window.isExpired(now));
         }
+        return windows.size() >= maxTrackedKeys;
+    }
+
+    private static String pathOf(HttpServletRequest request) {
+        return UrlPathHelper.defaultInstance.getPathWithinApplication(request);
     }
 
     private static void reject(HttpServletResponse response) throws IOException {
