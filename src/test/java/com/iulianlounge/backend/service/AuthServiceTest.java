@@ -3,6 +3,8 @@ package com.iulianlounge.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,6 +55,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(passwordEncoder.encode(anyString())).thenReturn("hash-de-relleno");
         authService = new AuthService(userRepository, passwordEncoder, jwtService, Clock.fixed(NOW, ZoneOffset.UTC));
         user = new User();
         user.setId(UUID.randomUUID());
@@ -92,6 +95,15 @@ class AuthServiceTest {
         InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class,
                 () -> authService.login(new LoginRequest("nadie", "12345678")));
         assertEquals(ErrorCode.AUTH_INVALID_CREDENTIALS, ex.getErrorCode());
+    }
+
+    @Test
+    void loginChecksPasswordEvenWhenUserDoesNotExist() {
+        when(userRepository.findByUsername("nadie")).thenReturn(Optional.empty());
+
+        assertThrows(InvalidCredentialsException.class,
+                () -> authService.login(new LoginRequest("nadie", "12345678")));
+        verify(passwordEncoder).matches(eq("12345678"), anyString());
     }
 
     @Test

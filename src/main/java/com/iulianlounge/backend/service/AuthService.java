@@ -3,6 +3,8 @@ package com.iulianlounge.backend.service;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final Clock clock;
+    private final String dummyPasswordHash;
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
             Clock clock) {
@@ -32,15 +35,17 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.clock = clock;
+        this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     public IssuedTokens login(LoginRequest request) {
-        User user = userRepository.findByUsername(request.username())
-                .orElseThrow(InvalidCredentialsException::new);
-
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        Optional<User> found = userRepository.findByUsername(request.username());
+        String hash = found.map(User::getPasswordHash).orElse(dummyPasswordHash);
+        boolean passwordMatches = passwordEncoder.matches(request.password(), hash);
+        if (found.isEmpty() || !passwordMatches) {
             throw new InvalidCredentialsException();
         }
+        User user = found.get();
 
         Instant now = clock.instant();
         return issue(user, now, now.plus(JwtService.REFRESH_TTL));
