@@ -12,9 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.iulianlounge.backend.domain.Rank;
 import com.iulianlounge.backend.domain.Language;
-import com.iulianlounge.backend.domain.TransactionType;
+import com.iulianlounge.backend.domain.Rank;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.MeResponse;
 import com.iulianlounge.backend.exception.InvalidTokenException;
@@ -27,30 +26,19 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private WalletService walletService;
+    private BarService barService;
 
     @Test
-    void getProfileReturnsUserDataWithStartingRank() {
+    void getProfileReturnsUserDataWithItsRank() {
         User user = cursaito();
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-        when(walletService.spentOn(user.getId(), TransactionType.BAR_ORDER)).thenReturn(0L);
+        when(barService.rankOf(user.getId())).thenReturn(Rank.HABITUAL);
 
-        MeResponse profile = new UserService(userRepository, walletService).getProfile(user.getId());
+        MeResponse profile = new UserService(userRepository, barService).getProfile(user.getId());
 
         assertEquals(user.getId(), profile.userId());
         assertEquals("cursaito", profile.username());
         assertEquals("es", profile.locale());
-        assertEquals(Rank.NADIE, profile.rank());
-    }
-
-    @Test
-    void getProfileDerivesTheRankFromWhatWasSpentAtTheBar() {
-        User user = cursaito();
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-        when(walletService.spentOn(user.getId(), TransactionType.BAR_ORDER)).thenReturn(30L);
-
-        MeResponse profile = new UserService(userRepository, walletService).getProfile(user.getId());
-
         assertEquals(Rank.HABITUAL, profile.rank());
     }
 
@@ -60,7 +48,7 @@ class UserServiceTest {
         when(userRepository.findById(deleted)).thenReturn(Optional.empty());
 
         assertThrows(InvalidTokenException.class,
-                () -> new UserService(userRepository, walletService).getProfile(deleted));
+                () -> new UserService(userRepository, barService).getProfile(deleted));
     }
 
     private static User cursaito() {
