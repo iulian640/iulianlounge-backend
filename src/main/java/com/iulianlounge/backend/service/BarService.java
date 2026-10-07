@@ -46,8 +46,9 @@ public class BarService {
         TokenTransaction movement = walletService.debit(userId, drink.price(), TransactionType.BAR_ORDER,
                 "order:" + idempotencyKey);
         long spent = walletService.spentOn(userId, TransactionType.BAR_ORDER);
+        Rank before = Rank.forSpent(spent - drink.price());
         Rank after = Rank.forSpent(spent);
-        boolean promoted = after != Rank.forSpent(spent - drink.price());
+        boolean promoted = after != before;
         long balance = movement.getBalanceAfter();
         boolean creditAvailable = creditAvailable(userId, balance);
         BarmanSituation situation = orderSituation(promoted, balance, creditAvailable);
