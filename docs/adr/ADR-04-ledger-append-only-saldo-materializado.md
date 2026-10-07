@@ -38,7 +38,7 @@ Reglas que mantienen ambos sincronizados:
 4. `idempotencyKey` UNIQUE en el ledger: los reintentos duplicados del
    cliente (doble clic en "apostar") mueren en la base de datos.
 5. Constraint CHECK `balance >= 0`: la última defensa está en la BD, no en Java.
-6. `credit`/`debit` abren su propia transacción y se niegan a correr dentro
+6. `credit`/`debit` (y `creditIf`, el crédito con condición sobre el saldo) abren su propia transacción y se niegan a correr dentro
    de otra: el reintento de la regla 3 necesita releer la cartera en una
    transacción limpia. Quien necesite que sus escrituras y el movimiento de
    fichas vayan juntos (el barman) le pasará su trabajo a `WalletService`

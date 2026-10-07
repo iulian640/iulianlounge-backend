@@ -41,7 +41,7 @@ Rules that keep both in sync:
    (double-clicking "bet") die at the database.
 5. CHECK constraint `balance >= 0`: the last line of defense lives in the
    DB, not in Java.
-6. `credit`/`debit` open their own transaction and refuse to run inside
+6. `credit`/`debit` (and `creditIf`, the credit with a balance condition) open their own transaction and refuse to run inside
    someone else's: the retry in rule 3 has to re-read the wallet in a clean
    transaction. A caller that needs its own writes and the chip movement to
    commit together (the bartender) hands its work to `WalletService` instead
