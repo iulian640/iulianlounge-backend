@@ -26,6 +26,7 @@ import com.iulianlounge.backend.security.ProblemDetailAuthenticationEntryPoint;
 public class SecurityConfig {
 
     private static final String BAR_PATH = "/api/v1/bar/";
+    private static final String BLACKJACK_PATH = "/api/v1/blackjack/";
 
     @Bean
     public PasswordEncoder passwordEncoder(){
@@ -36,6 +37,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService,
             @Value("${auth.rate-limit.max-per-minute:20}") int maxAuthAttemptsPerMinute,
             @Value("${bar.rate-limit.max-per-minute:30}") int maxBarRequestsPerMinute,
+            @Value("${blackjack.rate-limit.max-per-minute:60}") int maxBlackjackRequestsPerMinute,
             ObjectProvider<Clock> clock) throws Exception {
         Clock filterClock = clock.getIfAvailable(Clock::systemUTC);
         http
@@ -53,7 +55,9 @@ public class SecurityConfig {
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new MemberRateLimitFilter(List.of(
                         new MemberRateLimitFilter.Area(BAR_PATH, maxBarRequestsPerMinute,
-                                ErrorCode.BAR_TOO_MANY_REQUESTS)), filterClock),
+                                ErrorCode.BAR_TOO_MANY_REQUESTS),
+                        new MemberRateLimitFilter.Area(BLACKJACK_PATH, maxBlackjackRequestsPerMinute,
+                                ErrorCode.BLACKJACK_TOO_MANY_REQUESTS)), filterClock),
                         JwtAuthenticationFilter.class);
         return http.build();
     }

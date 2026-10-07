@@ -28,6 +28,9 @@ class MemberRateLimitFilterTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-07T20:00:00Z"), ZoneOffset.UTC);
     private static final MemberRateLimitFilter.Area BAR =
             new MemberRateLimitFilter.Area("/api/v1/bar/", LIMIT, ErrorCode.BAR_TOO_MANY_REQUESTS);
+    private static final MemberRateLimitFilter.Area BLACKJACK =
+            new MemberRateLimitFilter.Area("/api/v1/blackjack/", LIMIT, ErrorCode.BLACKJACK_TOO_MANY_REQUESTS);
+    private static final String DEAL = "/api/v1/blackjack/hands";
     private static final String ORDERS = "/api/v1/bar/orders";
     private static final String HOUSE_CREDIT = "/api/v1/bar/house-credit";
 
@@ -120,6 +123,87 @@ class MemberRateLimitFilterTest {
         send("POST", ORDERS, first);
         send("POST", ORDERS, first);
         assertEquals(429, send("POST", ORDERS, first).getStatus());
+    }
+
+    @Test
+    void pastTheLimitBlackjackPostsGetA429WithTheBlackjackCode() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, BLACKJACK), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i < LIMIT; i++) {
+            assertEquals(200, send("POST", DEAL, member).getStatus());
+        }
+        MockFilterChain chain = new MockFilterChain();
+        MockHttpServletResponse blocked = new MockHttpServletResponse();
+
+        authenticate(member);
+        filter.doFilter(new MockHttpServletRequest("POST", DEAL), blocked, chain);
+
+        assertEquals(429, blocked.getStatus());
+        assertTrue(blocked.getContentType().startsWith("application/problem+json"));
+        assertTrue(blocked.getContentAsString().contains("\"code\":\"blackjack.too_many_requests\""));
+        assertEquals("60", blocked.getHeader("Retry-After"));
+        assertNull(chain.getRequest());
+    }
+
+    @Test
+    void hitAndStandShareTheBlackjackBudgetWithTheDeal() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, BLACKJACK), CLOCK);
+        UUID member = UUID.randomUUID();
+        send("POST", DEAL, member);
+        send("POST", "/api/v1/blackjack/hands/" + UUID.randomUUID() + "/hit", member);
+        send("POST", "/api/v1/blackjack/hands/" + UUID.randomUUID() + "/stand", member);
+
+        assertEquals(429, send("POST", DEAL, member).getStatus());
+    }
+
+    @Test
+    void theBarAndTheBlackjackTableHaveSeparateBudgetsPerMember() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, BLACKJACK), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i <= LIMIT; i++) {
+            send("POST", DEAL, member);
+        }
+
+        assertEquals(429, send("POST", DEAL, member).getStatus());
+        assertEquals(200, send("POST", ORDERS, member).getStatus());
+        for (int i = 1; i < LIMIT; i++) {
+            assertEquals(200, send("POST", ORDERS, member).getStatus());
+        }
+        assertEquals(429, send("POST", ORDERS, member).getStatus());
+    }
+
+    @Test
+    void anAreaCanHaveItsOwnLimit() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, new MemberRateLimitFilter.Area("/api/v1/blackjack/", 1,
+                ErrorCode.BLACKJACK_TOO_MANY_REQUESTS)), CLOCK);
+        UUID member = UUID.randomUUID();
+        send("POST", DEAL, member);
+
+        assertEquals(429, send("POST", DEAL, member).getStatus());
+        for (int i = 0; i < LIMIT; i++) {
+            assertEquals(200, send("POST", ORDERS, member).getStatus());
+        }
+    }
+
+    @Test
+    void readingTheTableIsNotLimited() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, BLACKJACK), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i < LIMIT * 3; i++) {
+            assertEquals(200, send("GET", "/api/v1/blackjack", member).getStatus());
+        }
+    }
+
+    @Test
+    void anAnonymousBlackjackRequestPassesThroughSoSecurityCanAnswer401() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, BLACKJACK), CLOCK);
+        MockFilterChain chain = null;
+        for (int i = 0; i <= LIMIT; i++) {
+            chain = new MockFilterChain();
+            filter.doFilter(new MockHttpServletRequest("POST", DEAL), new MockHttpServletResponse(), chain);
+        }
+
+        assertNotNull(chain.getRequest());
     }
 
     private MockHttpServletResponse send(String method, String path, UUID member) throws Exception {
