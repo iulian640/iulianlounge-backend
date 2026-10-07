@@ -1,6 +1,7 @@
 package com.iulianlounge.backend.config;
 
 import java.time.Clock;
+import java.util.List;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,14 +15,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import com.iulianlounge.backend.exception.ErrorCode;
 import com.iulianlounge.backend.security.AuthRateLimitFilter;
-import com.iulianlounge.backend.security.BarRateLimitFilter;
 import com.iulianlounge.backend.security.JwtAuthenticationFilter;
 import com.iulianlounge.backend.security.JwtService;
+import com.iulianlounge.backend.security.MemberRateLimitFilter;
 import com.iulianlounge.backend.security.ProblemDetailAuthenticationEntryPoint;
 
 @Configuration
 public class SecurityConfig {
+
+    private static final String BAR_PATH = "/api/v1/bar/";
 
     @Bean
     public PasswordEncoder passwordEncoder(){
@@ -47,7 +51,9 @@ public class SecurityConfig {
                 .addFilterBefore(new AuthRateLimitFilter(maxAuthAttemptsPerMinute, filterClock),
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new BarRateLimitFilter(maxBarRequestsPerMinute, filterClock),
+                .addFilterAfter(new MemberRateLimitFilter(List.of(
+                        new MemberRateLimitFilter.Area(BAR_PATH, maxBarRequestsPerMinute,
+                                ErrorCode.BAR_TOO_MANY_REQUESTS)), filterClock),
                         JwtAuthenticationFilter.class);
         return http.build();
     }

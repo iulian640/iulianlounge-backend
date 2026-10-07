@@ -20,17 +20,22 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-class BarRateLimitFilterTest {
+import com.iulianlounge.backend.exception.ErrorCode;
+
+class MemberRateLimitFilterTest {
 
     private static final int LIMIT = 3;
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-07T20:00:00Z"), ZoneOffset.UTC);
+    private static final MemberRateLimitFilter.Area BAR =
+            new MemberRateLimitFilter.Area("/api/v1/bar/", LIMIT, ErrorCode.BAR_TOO_MANY_REQUESTS);
     private static final String ORDERS = "/api/v1/bar/orders";
     private static final String HOUSE_CREDIT = "/api/v1/bar/house-credit";
 
-    private BarRateLimitFilter filter;
+    private MemberRateLimitFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new BarRateLimitFilter(LIMIT, Clock.fixed(Instant.parse("2026-10-07T20:00:00Z"), ZoneOffset.UTC));
+        filter = new MemberRateLimitFilter(List.of(BAR), CLOCK);
     }
 
     @AfterEach
@@ -106,7 +111,7 @@ class BarRateLimitFilterTest {
 
     @Test
     void whenTrackingIsFullNewMembersAreLetThroughInsteadOfLockingEveryoneOut() throws Exception {
-        filter = new BarRateLimitFilter(LIMIT, Clock.fixed(Instant.parse("2026-10-07T20:00:00Z"), ZoneOffset.UTC), 2);
+        filter = new MemberRateLimitFilter(List.of(BAR), CLOCK, 2);
         UUID first = UUID.randomUUID();
         send("POST", ORDERS, first);
         send("POST", ORDERS, UUID.randomUUID());
