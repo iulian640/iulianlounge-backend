@@ -8,6 +8,7 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		# Sin firma del servidor
 		-Server
+		-Via
 	}
 }
 
@@ -16,6 +17,8 @@
 	encode zstd gzip
 	import security_headers
 	request_header -Forwarded
+	request_header -X-Forwarded-Port
+	request_header -X-Real-IP
 
 	redir /presentacion /presentacion/ 308
 	handle /presentacion/* {
