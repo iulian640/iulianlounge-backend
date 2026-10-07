@@ -55,7 +55,7 @@ class ClientIpBehindProxyTest {
     }
 
     @Test
-    void productionTrustsOnlyTheProxysForwardedFor() throws IOException {
+    void productionUsesTheNativeForwardHeadersStrategy() throws IOException {
         Properties production = new Properties();
         try (InputStream file = getClass().getResourceAsStream("/application-prod.properties")) {
             assertNotNull(file, "application-prod.properties is missing");
