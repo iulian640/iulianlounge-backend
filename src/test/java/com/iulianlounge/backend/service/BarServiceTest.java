@@ -221,6 +221,21 @@ class BarServiceTest {
     }
 
     @Test
+    void repeatingAnOrderAfterOtherOrdersKeepsItsBalanceButRecalculatesTheRank() {
+        UUID key = UUID.randomUUID();
+        when(walletService.debit(USER_ID, 40, TransactionType.BAR_ORDER, "order:" + key)).thenReturn(order(-40, 60));
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(40L, 65L);
+
+        OrderResponse first = barService.order(USER_ID, Drink.FRENCH_75, key);
+        OrderResponse repeatedAfterASidecar = barService.order(USER_ID, Drink.FRENCH_75, key);
+
+        assertTrue(first.promoted());
+        assertEquals(60, repeatedAfterASidecar.balance());
+        assertEquals(Rank.HABITUAL, repeatedAfterASidecar.rank());
+        assertFalse(repeatedAfterASidecar.promoted());
+    }
+
+    @Test
     void theRankComesFromWhatWasSpentAtTheBar() {
         when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(300L);
 
