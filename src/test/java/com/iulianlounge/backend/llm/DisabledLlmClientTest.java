@@ -34,6 +34,7 @@ class DisabledLlmClientTest {
     @Test
     void everyReasonIsALowerCaseLogToken() {
         assertEquals("timeout", LlmUnavailableException.Reason.TIMEOUT.code());
+        assertEquals("network", LlmUnavailableException.Reason.NETWORK.code());
         assertEquals("http_4xx", LlmUnavailableException.Reason.HTTP_4XX.code());
         assertEquals("http_5xx", LlmUnavailableException.Reason.HTTP_5XX.code());
         assertEquals("parse", LlmUnavailableException.Reason.PARSE.code());
