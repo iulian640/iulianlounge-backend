@@ -13,6 +13,12 @@
 		-Server
 	}
 
+	redir /presentacion /presentacion/ 308
+	handle /presentacion/* {
+		root * /srv
+		file_server
+	}
+
 	# La API y el health, al backend por la red interna de Docker
 	handle /api/* {
 		reverse_proxy backend:8080
