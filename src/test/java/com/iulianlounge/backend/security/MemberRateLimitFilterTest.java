@@ -30,6 +30,11 @@ class MemberRateLimitFilterTest {
             new MemberRateLimitFilter.Area("/api/v1/bar/", LIMIT, ErrorCode.BAR_TOO_MANY_REQUESTS);
     private static final MemberRateLimitFilter.Area BLACKJACK =
             new MemberRateLimitFilter.Area("/api/v1/blackjack/", LIMIT, ErrorCode.BLACKJACK_TOO_MANY_REQUESTS);
+    private static final int TALK_LIMIT = 2;
+    private static final MemberRateLimitFilter.Area TALK = new MemberRateLimitFilter.Area("/api/v1/bar/talk",
+            MemberRateLimitFilter.Match.EXACT, TALK_LIMIT, ErrorCode.BAR_TOO_MANY_REQUESTS,
+            MemberRateLimitFilter.Overflow.REJECT);
+    private static final String TALK_PATH = "/api/v1/bar/talk";
     private static final String DEAL = "/api/v1/blackjack/hands";
     private static final String ORDERS = "/api/v1/bar/orders";
     private static final String HOUSE_CREDIT = "/api/v1/bar/house-credit";
@@ -201,6 +206,111 @@ class MemberRateLimitFilterTest {
         for (int i = 0; i <= LIMIT; i++) {
             chain = new MockFilterChain();
             filter.doFilter(new MockHttpServletRequest("POST", DEAL), new MockHttpServletResponse(), chain);
+        }
+
+        assertNotNull(chain.getRequest());
+    }
+
+    @Test
+    void pastItsOwnLimitTalkingGetsA429WithTheBarCodeThatNeverReachesTheTalk() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, TALK), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i < TALK_LIMIT; i++) {
+            assertEquals(200, send("POST", TALK_PATH, member).getStatus());
+        }
+        MockFilterChain chain = new MockFilterChain();
+        MockHttpServletResponse blocked = new MockHttpServletResponse();
+
+        authenticate(member);
+        filter.doFilter(new MockHttpServletRequest("POST", TALK_PATH), blocked, chain);
+
+        assertEquals(429, blocked.getStatus());
+        assertTrue(blocked.getContentType().startsWith("application/problem+json"));
+        assertTrue(blocked.getContentAsString().contains("\"code\":\"bar.too_many_requests\""));
+        assertEquals("60", blocked.getHeader("Retry-After"));
+        assertNull(chain.getRequest());
+    }
+
+    @Test
+    void talkingDoesNotSpendTheBudgetOfOrderingDrinks() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, TALK), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i <= TALK_LIMIT; i++) {
+            send("POST", TALK_PATH, member);
+        }
+
+        for (int i = 0; i < LIMIT; i++) {
+            assertEquals(200, send("POST", ORDERS, member).getStatus());
+        }
+        assertEquals(429, send("POST", ORDERS, member).getStatus());
+    }
+
+    @Test
+    void orderingDrinksDoesNotSpendTheBudgetOfTalking() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, TALK), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i <= LIMIT; i++) {
+            send("POST", ORDERS, member);
+        }
+
+        for (int i = 0; i < TALK_LIMIT; i++) {
+            assertEquals(200, send("POST", TALK_PATH, member).getStatus());
+        }
+        assertEquals(429, send("POST", TALK_PATH, member).getStatus());
+    }
+
+    @Test
+    void theBudgetsStaySeparateWhateverTheOrderOfTheAreas() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(TALK, BAR), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i <= TALK_LIMIT; i++) {
+            send("POST", TALK_PATH, member);
+        }
+
+        for (int i = 0; i < LIMIT; i++) {
+            assertEquals(200, send("POST", ORDERS, member).getStatus());
+        }
+        assertEquals(429, send("POST", ORDERS, member).getStatus());
+    }
+
+    @Test
+    void onlyTheExactTalkPathHasTheTalkBudget() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, TALK), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i < LIMIT; i++) {
+            send("POST", TALK_PATH + "ative", member);
+        }
+
+        assertEquals(429, send("POST", TALK_PATH + "/extra", member).getStatus());
+        assertEquals(200, send("POST", TALK_PATH, member).getStatus());
+    }
+
+    @Test
+    void readingTheTalkPathIsNotLimited() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, TALK), CLOCK);
+        UUID member = UUID.randomUUID();
+        for (int i = 0; i < TALK_LIMIT * 3; i++) {
+            assertEquals(200, send("GET", TALK_PATH, member).getStatus());
+        }
+    }
+
+    @Test
+    void whenTrackingIsFullTalkingIsRejectedInsteadOfLettingMoneyLeak() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, TALK), CLOCK, 2);
+        send("POST", TALK_PATH, UUID.randomUUID());
+        send("POST", TALK_PATH, UUID.randomUUID());
+
+        assertEquals(429, send("POST", TALK_PATH, UUID.randomUUID()).getStatus());
+        assertEquals(200, send("POST", ORDERS, UUID.randomUUID()).getStatus());
+    }
+
+    @Test
+    void anAnonymousTalkPassesThroughSoSecurityCanAnswer401() throws Exception {
+        filter = new MemberRateLimitFilter(List.of(BAR, TALK), CLOCK);
+        MockFilterChain chain = null;
+        for (int i = 0; i <= TALK_LIMIT; i++) {
+            chain = new MockFilterChain();
+            filter.doFilter(new MockHttpServletRequest("POST", TALK_PATH), new MockHttpServletResponse(), chain);
         }
 
         assertNotNull(chain.getRequest());
