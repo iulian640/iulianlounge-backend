@@ -44,7 +44,8 @@ class BarFlowTest {
         order(bearer, firstOrder, "FRENCH_75")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.balance").value(60))
-                .andExpect(jsonPath("$.promoted").value(false));
+                .andExpect(jsonPath("$.promoted").value(true))
+                .andExpect(jsonPath("$.line").value("barman.promotion.habitual"));
 
         mockMvc.perform(get("/api/v1/me").header("Authorization", bearer))
                 .andExpect(status().isOk())

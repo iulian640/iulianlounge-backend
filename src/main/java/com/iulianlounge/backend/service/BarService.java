@@ -43,11 +43,12 @@ public class BarService {
     }
 
     public OrderResponse order(UUID userId, Drink drink, UUID idempotencyKey) {
-        Rank before = rankOf(userId);
-        walletService.debit(userId, drink.price(), TransactionType.BAR_ORDER, "order:" + idempotencyKey);
-        long balance = walletService.getBalance(userId);
-        Rank after = rankOf(userId);
-        boolean promoted = after != before;
+        TokenTransaction movement = walletService.debit(userId, drink.price(), TransactionType.BAR_ORDER,
+                "order:" + idempotencyKey);
+        long spent = walletService.spentOn(userId, TransactionType.BAR_ORDER);
+        Rank after = Rank.forSpent(spent);
+        boolean promoted = after != Rank.forSpent(spent - drink.price());
+        long balance = movement.getBalanceAfter();
         boolean creditAvailable = creditAvailable(userId, balance);
         BarmanSituation situation = orderSituation(promoted, balance, creditAvailable);
         return new OrderResponse(drink, drink.price(), balance, after, promoted, creditAvailable,

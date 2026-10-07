@@ -433,12 +433,6 @@ sequenceDiagram
     F->>BC: petición autenticada
     BC->>BS: order(userId, drink, idempotencyKey)
 
-    BS->>WS: spentOn(userId, BAR_ORDER)
-    WS->>DB: cartera por user_id y SUM(amount) de BAR_ORDER
-    DB-->>WS: suma (negativa)
-    WS-->>BS: gastado = -suma
-    Note over BS: rango antes = Rank.forSpent(gastado)
-
     BS->>WS: debit(userId, drink.price(), BAR_ORDER, "order:" + idempotencyKey)
     Note over WS,DB: transacción propia. Si choca @Version, un reintento
     WS->>DB: cartera por user_id y movimiento previo con esa clave
@@ -453,13 +447,11 @@ sequenceDiagram
             WS-->>BS: TokenTransaction previa, no cobra otra vez
         end
         Note over BS,DB: desde aquí, lecturas fuera de la transacción del cobro
-        BS->>WS: getBalance(userId)
-        WS->>DB: cartera por user_id
-        WS-->>BS: saldo
+        Note over BS: saldo = balance_after del movimiento
         BS->>WS: spentOn(userId, BAR_ORDER)
         WS->>DB: cartera por user_id y SUM(amount) de BAR_ORDER
-        WS-->>BS: gastado
-        Note over BS: rango después y promoted = después distinto de antes
+        WS-->>BS: gastado (ya incluye este pedido)
+        Note over BS: rango = forSpent(gastado), promoted si forSpent(gastado - precio) era otro
         opt saldo menor que la copa más barata (5)
             BS->>WS: hasMovement(userId, "house-credit:" + fecha)
             WS->>DB: movimiento con esa clave
@@ -476,7 +468,7 @@ sequenceDiagram
     end
 ```
 
-- El cobro va en su propia transacción. `WalletService.debit` lanza `IllegalStateException` si ya hay una abierta, y `BarService.order` no lleva `@Transactional`. Solo el cobro es atómico. Las lecturas de después van sueltas, así que otro pedido del mismo usuario puede colarse entre el cobro y `getBalance`.
+- El cobro va en su propia transacción. `WalletService.debit` lanza `IllegalStateException` si ya hay una abierta, y `BarService.order` no lleva `@Transactional`. Solo el cobro es atómico. El saldo de la respuesta sale del propio movimiento, y el rango de antes se deduce restando el precio a lo gastado. Así, repetir el pedido con la misma clave da la misma respuesta, ascenso incluido.
 - `spentOn` devuelve la suma cambiada de signo. Los `BAR_ORDER` se guardan en negativo y el gasto sale en positivo.
 - `hasMovement` solo se llama si el saldo tras el pedido no llega para la copa más barata (`Drink.cheapestPrice()`, 5 fichas). Si llega, `creditAvailable` es `false` y no se hace ninguna consulta.
 - La clave `order:<uuid>` hace el pedido idempotente. Si el cliente repite la petición con la misma clave, `WalletService` devuelve el movimiento que ya existe antes de mirar el saldo, y no cobra otra vez. Si la clave ya se usó con otro importe o tipo, responde 409 `wallet.idempotency_mismatch`.

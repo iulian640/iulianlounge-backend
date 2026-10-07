@@ -92,8 +92,8 @@ class BarServiceTest {
     @Test
     void anOrderIsChargedToTheWalletUnderItsIdempotencyKey() {
         UUID key = UUID.randomUUID();
-        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(0L, 40L);
-        when(walletService.getBalance(USER_ID)).thenReturn(60L);
+        when(walletService.debit(USER_ID, 40, TransactionType.BAR_ORDER, "order:" + key)).thenReturn(order(-40, 60));
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(40L);
 
         OrderResponse order = barService.order(USER_ID, Drink.FRENCH_75, key);
 
@@ -108,10 +108,11 @@ class BarServiceTest {
 
     @Test
     void anOrderWithoutPromotionGetsTheUsualService() {
-        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(30L, 40L);
-        when(walletService.getBalance(USER_ID)).thenReturn(60L);
+        UUID key = UUID.randomUUID();
+        when(walletService.debit(USER_ID, 10, TransactionType.BAR_ORDER, "order:" + key)).thenReturn(order(-10, 60));
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(40L);
 
-        OrderResponse order = barService.order(USER_ID, Drink.BEES_KNEES, UUID.randomUUID());
+        OrderResponse order = barService.order(USER_ID, Drink.BEES_KNEES, key);
 
         assertFalse(order.promoted());
         assertFalse(order.creditAvailable());
@@ -120,11 +121,12 @@ class BarServiceTest {
 
     @Test
     void anOrderThatEmptiesTheWalletOffersTheHouseCredit() {
-        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(120L, 125L);
-        when(walletService.getBalance(USER_ID)).thenReturn(0L);
+        UUID key = UUID.randomUUID();
+        when(walletService.debit(USER_ID, 5, TransactionType.BAR_ORDER, "order:" + key)).thenReturn(order(-5, 0));
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(125L);
         when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
 
-        OrderResponse order = barService.order(USER_ID, Drink.BATHTUB_GIN, UUID.randomUUID());
+        OrderResponse order = barService.order(USER_ID, Drink.BATHTUB_GIN, key);
 
         assertFalse(order.promoted());
         assertTrue(order.creditAvailable());
@@ -133,11 +135,12 @@ class BarServiceTest {
 
     @Test
     void aPromotionIsAnnouncedEvenIfTheWalletIsLeftEmpty() {
-        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(95L, 100L);
-        when(walletService.getBalance(USER_ID)).thenReturn(0L);
+        UUID key = UUID.randomUUID();
+        when(walletService.debit(USER_ID, 5, TransactionType.BAR_ORDER, "order:" + key)).thenReturn(order(-5, 0));
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(100L);
         when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
 
-        OrderResponse order = barService.order(USER_ID, Drink.BATHTUB_GIN, UUID.randomUUID());
+        OrderResponse order = barService.order(USER_ID, Drink.BATHTUB_GIN, key);
 
         assertTrue(order.promoted());
         assertTrue(order.creditAvailable());
@@ -147,7 +150,6 @@ class BarServiceTest {
     @Test
     void anOrderWithoutEnoughChipsIsRejected() {
         UUID key = UUID.randomUUID();
-        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(0L);
         doThrow(new InsufficientFundsException())
                 .when(walletService).debit(USER_ID, 40, TransactionType.BAR_ORDER, "order:" + key);
 
@@ -190,6 +192,19 @@ class BarServiceTest {
     }
 
     @Test
+    void repeatingAnOrderWithTheSameKeyAnnouncesTheSamePromotion() {
+        UUID key = UUID.randomUUID();
+        when(walletService.debit(USER_ID, 40, TransactionType.BAR_ORDER, "order:" + key)).thenReturn(order(-40, 60));
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(40L);
+
+        OrderResponse first = barService.order(USER_ID, Drink.FRENCH_75, key);
+        OrderResponse repeated = barService.order(USER_ID, Drink.FRENCH_75, key);
+
+        assertEquals(first, repeated);
+        assertTrue(repeated.promoted());
+    }
+
+    @Test
     void theRankComesFromWhatWasSpentAtTheBar() {
         when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(300L);
 
@@ -199,5 +214,10 @@ class BarServiceTest {
     @Test
     void theClubDayFollowsMadridTime() {
         assertEquals(TODAYS_CREDIT, barService.houseCreditKey());
+    }
+
+    private static TokenTransaction order(long amount, long balanceAfter) {
+        return new TokenTransaction(UUID.randomUUID(), amount, TransactionType.BAR_ORDER, balanceAfter, null,
+                NIGHT_IN_MADRID);
     }
 }
