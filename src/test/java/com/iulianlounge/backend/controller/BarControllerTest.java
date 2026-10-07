@@ -11,6 +11,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -133,6 +135,29 @@ class BarControllerTest {
                         """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("request.rejected"));
+        verifyNoInteractions(barService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "\"4\""})
+    void anOrderThatNamesTheDrinkByItsPositionIsRejected(String drink) throws Exception {
+        mockMvc.perform(order(UUID.randomUUID().toString(), "{\"drink\":" + drink + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("request.rejected"));
+        verifyNoInteractions(barService);
+    }
+
+    @Test
+    void ordersAndHouseCreditNeedAToken() throws Exception {
+        mockMvc.perform(post("/api/v1/bar/orders")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"drink\":\"SIDECAR\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("auth.required"));
+        mockMvc.perform(post("/api/v1/bar/house-credit"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("auth.required"));
         verifyNoInteractions(barService);
     }
 
