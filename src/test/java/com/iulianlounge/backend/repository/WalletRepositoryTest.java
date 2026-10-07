@@ -1,5 +1,7 @@
 package com.iulianlounge.backend.repository;
 
+import static com.iulianlounge.backend.repository.ConstraintAssertions.assertViolates;
+import static com.iulianlounge.backend.repository.ConstraintAssertions.rootMessage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,7 +14,6 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -132,7 +133,8 @@ class WalletRepositoryTest {
     @ParameterizedTest
     @EnumSource(TransactionType.class)
     void everyMovementTypeFitsTheDatabaseCheck(TransactionType type) {
-        long amount = type == TransactionType.BAR_ORDER ? -10 : 10;
+        boolean spends = type == TransactionType.BAR_ORDER || type == TransactionType.BLACKJACK_BET;
+        long amount = spends ? -10 : 10;
 
         transactionRepository.saveAndFlush(new TokenTransaction(wallet.getId(), amount, type, 10, null, NOW));
     }
@@ -143,21 +145,19 @@ class WalletRepositoryTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"BAR_ORDER, 10", "WELCOME_BONUS, -10", "HOUSE_CREDIT, -10"})
+    @CsvSource({"BAR_ORDER, 10", "WELCOME_BONUS, -10", "HOUSE_CREDIT, -10", "BLACKJACK_BET, 10",
+            "BLACKJACK_PAYOUT, -10"})
     void databaseRejectsAMovementWhoseSignDoesNotMatchItsType(String type, long amount) {
         assertViolates("token_transaction_amount_sign_check", () -> insertMovement(type, amount));
     }
 
     @Test
     void aViolationNamesTheConstraintButCarriesNoRowValues() {
-        PersistenceException error = assertThrows(PersistenceException.class, () -> insertMovement("BAR_ORDER", 10));
+        RuntimeException error = assertThrows(RuntimeException.class, () -> insertMovement("BAR_ORDER", 10));
 
-        Throwable cause = error;
-        while (cause.getCause() != null) {
-            cause = cause.getCause();
-        }
-        assertTrue(cause.getMessage().contains("token_transaction_amount_sign_check"), cause.getMessage());
-        assertFalse(cause.getMessage().contains("Failing row"), cause.getMessage());
+        String message = rootMessage(error);
+        assertTrue(message.contains("token_transaction_amount_sign_check"), message);
+        assertFalse(message.contains("Failing row"), message);
     }
 
     @Test
@@ -185,15 +185,6 @@ class WalletRepositoryTest {
         long sum = transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), TransactionType.BAR_ORDER);
 
         assertEquals(0, sum);
-    }
-
-    private static void assertViolates(String constraint, Executable insert) {
-        PersistenceException error = assertThrows(PersistenceException.class, insert);
-        Throwable cause = error;
-        while (cause.getCause() != null) {
-            cause = cause.getCause();
-        }
-        assertTrue(cause.getMessage().contains(constraint), cause.getMessage());
     }
 
     private void insertMovement(String type, long amount) {
