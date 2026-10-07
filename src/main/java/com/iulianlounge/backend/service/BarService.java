@@ -22,7 +22,7 @@ import com.iulianlounge.backend.exception.HouseCreditUsedTodayException;
 @Service
 public class BarService {
 
-    public static final long HOUSE_CREDIT = 50;
+    public static final long HOUSE_CREDIT_AMOUNT = 50;
 
     static final ZoneId CLUB_ZONE = ZoneId.of("Europe/Madrid");
 
@@ -63,10 +63,10 @@ public class BarService {
         if (walletService.hasMovement(userId, key)) {
             throw new HouseCreditUsedTodayException();
         }
-        TokenTransaction credit = walletService.creditIf(userId, HOUSE_CREDIT, TransactionType.HOUSE_CREDIT, key,
+        TokenTransaction movement = walletService.creditIf(userId, HOUSE_CREDIT_AMOUNT, TransactionType.HOUSE_CREDIT, key,
                 BarService::isBroke).orElseThrow(HouseCreditNotNeededException::new);
         Rank rank = rankOf(userId);
-        return new HouseCreditResponse(HOUSE_CREDIT, credit.getBalanceAfter(), rank,
+        return new HouseCreditResponse(HOUSE_CREDIT_AMOUNT, movement.getBalanceAfter(), rank,
                 BarmanSituation.HOUSE_CREDIT.lineFor(rank));
     }
 

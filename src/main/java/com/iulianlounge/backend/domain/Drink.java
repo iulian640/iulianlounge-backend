@@ -9,6 +9,8 @@ public enum Drink {
     SIDECAR(25),
     FRENCH_75(40);
 
+    private static final long CHEAPEST_PRICE = Arrays.stream(values()).mapToLong(Drink::price).min().orElseThrow();
+
     private final long price;
 
     Drink(long price) {
@@ -20,6 +22,6 @@ public enum Drink {
     }
 
     public static long cheapestPrice() {
-        return Arrays.stream(values()).mapToLong(Drink::price).min().orElseThrow();
+        return CHEAPEST_PRICE;
     }
 }

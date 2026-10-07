@@ -163,7 +163,7 @@ class BarServiceTest {
     void theHouseLendsFiftyChipsUnderTodaysKey() {
         when(walletService.getBalance(USER_ID)).thenReturn(3L);
         when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
-        when(walletService.creditIf(eq(USER_ID), eq(BarService.HOUSE_CREDIT), eq(TransactionType.HOUSE_CREDIT),
+        when(walletService.creditIf(eq(USER_ID), eq(BarService.HOUSE_CREDIT_AMOUNT), eq(TransactionType.HOUSE_CREDIT),
                 eq(TODAYS_CREDIT), any()))
                 .thenReturn(Optional.of(new TokenTransaction(UUID.randomUUID(), 50, TransactionType.HOUSE_CREDIT, 53,
                         TODAYS_CREDIT, NIGHT_IN_MADRID)));
@@ -182,7 +182,7 @@ class BarServiceTest {
         ArgumentCaptor<LongPredicate> condition = ArgumentCaptor.forClass(LongPredicate.class);
         when(walletService.getBalance(USER_ID)).thenReturn(0L);
         when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
-        when(walletService.creditIf(eq(USER_ID), eq(BarService.HOUSE_CREDIT), eq(TransactionType.HOUSE_CREDIT),
+        when(walletService.creditIf(eq(USER_ID), eq(BarService.HOUSE_CREDIT_AMOUNT), eq(TransactionType.HOUSE_CREDIT),
                 eq(TODAYS_CREDIT), condition.capture())).thenReturn(Optional.empty());
 
         assertThrows(HouseCreditNotNeededException.class, () -> barService.houseCredit(USER_ID));
