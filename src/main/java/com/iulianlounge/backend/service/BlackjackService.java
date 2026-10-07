@@ -16,6 +16,7 @@ import com.iulianlounge.backend.domain.BlackjackTable;
 import com.iulianlounge.backend.domain.Card;
 import com.iulianlounge.backend.domain.HandStatus;
 import com.iulianlounge.backend.domain.Shuffler;
+import com.iulianlounge.backend.domain.TokenTransaction;
 import com.iulianlounge.backend.domain.TransactionType;
 import com.iulianlounge.backend.dto.BetOption;
 import com.iulianlounge.backend.dto.BlackjackResponse;
@@ -47,6 +48,7 @@ public class BlackjackService {
     }
 
     public BlackjackResponse table(UUID userId) {
+        reconcile(userId);
         HandView hand = handRepository.findByUserIdAndStatus(userId, HandStatus.PLAYER_TURN)
                 .map(HandView::of)
                 .orElse(null);
@@ -54,6 +56,7 @@ public class BlackjackService {
     }
 
     public HandResponse deal(UUID userId, Bet bet, UUID idempotencyKey) {
+        reconcile(userId);
         Optional<BlackjackHand> replay = handRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
         if (replay.isPresent()) {
             return answerReplay(userId, bet, replay.get());
@@ -76,6 +79,33 @@ public class BlackjackService {
         return play(userId, handId, BlackjackRules::stand);
     }
 
+    private void reconcile(UUID userId) {
+        if (walletService.spentOn(userId, TransactionType.BLACKJACK_BET) != handRepository.sumBetByUserId(userId)) {
+            adoptOrphanBets(userId);
+        }
+        handRepository.findUnsettledByUserId(userId).forEach(this::settle);
+    }
+
+    private void adoptOrphanBets(UUID userId) {
+        for (TokenTransaction movement : walletService.movementsOf(userId, TransactionType.BLACKJACK_BET)) {
+            keyOf(movement)
+                    .filter(key -> handRepository.findByUserIdAndIdempotencyKey(userId, key).isEmpty())
+                    .ifPresent(key -> seatDealtHand(userId, key, Bet.fromChips(-movement.getAmount())));
+        }
+    }
+
+    private static Optional<UUID> keyOf(TokenTransaction bet) {
+        String ledgerKey = bet.getIdempotencyKey();
+        if (ledgerKey == null || !ledgerKey.startsWith(BET_KEY_PREFIX)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(UUID.fromString(ledgerKey.substring(BET_KEY_PREFIX.length())));
+        } catch (IllegalArgumentException notAKey) {
+            return Optional.empty();
+        }
+    }
+
     private HandResponse answerReplay(UUID userId, Bet bet, BlackjackHand existing) {
         if (existing.getBet() != bet) {
             throw new IdempotencyMismatchException();
@@ -87,6 +117,7 @@ public class BlackjackService {
     }
 
     private HandResponse play(UUID userId, UUID handId, UnaryOperator<BlackjackTable> move) {
+        reconcile(userId);
         BlackjackHand hand = find(userId, handId);
         if (hand.getStatus() != HandStatus.PLAYER_TURN) {
             throw new HandFinishedException();

@@ -48,6 +48,7 @@ import com.iulianlounge.backend.exception.HandInProgressException;
 import com.iulianlounge.backend.exception.HandNotFoundException;
 import com.iulianlounge.backend.exception.IdempotencyMismatchException;
 import com.iulianlounge.backend.exception.InsufficientFundsException;
+import com.iulianlounge.backend.exception.WalletConflictException;
 import com.iulianlounge.backend.repository.BlackjackHandRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -410,6 +411,250 @@ class BlackjackServiceTest {
         assertNull(response.hand());
         assertEquals(100, response.balance());
         assertSame(response.bets().get(0).code(), Bet.TEN);
+    }
+
+    @Test
+    void whenTheBetSumsMatchNoMovementsAreListed() {
+        when(walletService.spentOn(USER_ID, TransactionType.BLACKJACK_BET)).thenReturn(30L);
+        when(handRepository.sumBetByUserId(USER_ID)).thenReturn(30L);
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(70L);
+
+        service.table(USER_ID);
+
+        verify(walletService, never()).movementsOf(any(), any());
+    }
+
+    @Test
+    void anOrphanBetIsAdoptedAsADealtHandWithItsKeyAndBet() {
+        stack("9S", "KD", "8H", "5C");
+        when(walletService.spentOn(USER_ID, TransactionType.BLACKJACK_BET)).thenReturn(20L);
+        when(handRepository.sumBetByUserId(USER_ID)).thenReturn(0L);
+        when(walletService.movementsOf(USER_ID, TransactionType.BLACKJACK_BET))
+                .thenReturn(List.of(orphanBet(20, KEY)));
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY)).thenReturn(Optional.empty());
+        when(handRepository.saveAndFlush(any())).thenAnswer(call -> withId(call.getArgument(0)));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(80L);
+
+        service.table(USER_ID);
+
+        ArgumentCaptor<BlackjackHand> saved = ArgumentCaptor.forClass(BlackjackHand.class);
+        verify(handRepository).saveAndFlush(saved.capture());
+        assertEquals(KEY, saved.getValue().getIdempotencyKey());
+        assertEquals(Bet.TWENTY, saved.getValue().getBet());
+        assertEquals(HandStatus.PLAYER_TURN, saved.getValue().getStatus());
+        verify(walletService, never()).debit(any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void anOrphanBetWithTheTableTakenBecomesAVoidHandAndIsRefunded() {
+        stack("9S", "KD", "8H", "5C");
+        when(walletService.spentOn(USER_ID, TransactionType.BLACKJACK_BET)).thenReturn(20L);
+        when(handRepository.sumBetByUserId(USER_ID)).thenReturn(0L);
+        when(walletService.movementsOf(USER_ID, TransactionType.BLACKJACK_BET))
+                .thenReturn(List.of(orphanBet(20, KEY)));
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY)).thenReturn(Optional.empty());
+        when(handRepository.saveAndFlush(any()))
+                .thenThrow(new DataIntegrityViolationException("blackjack_hand_one_in_progress"))
+                .thenAnswer(call -> withId(call.getArgument(0)));
+        when(walletService.credit(USER_ID, 20, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY))
+                .thenReturn(movement(20, 100));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(100L);
+
+        service.table(USER_ID);
+
+        ArgumentCaptor<BlackjackHand> saved = ArgumentCaptor.forClass(BlackjackHand.class);
+        verify(handRepository, times(3)).saveAndFlush(saved.capture());
+        assertEquals(HandStatus.VOID, saved.getAllValues().get(1).getStatus());
+        verify(walletService).credit(USER_ID, 20, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY);
+    }
+
+    @Test
+    void aBetThatAlreadyHasItsHandIsNotAdoptedAgain() {
+        when(walletService.spentOn(USER_ID, TransactionType.BLACKJACK_BET)).thenReturn(40L);
+        when(handRepository.sumBetByUserId(USER_ID)).thenReturn(20L);
+        when(walletService.movementsOf(USER_ID, TransactionType.BLACKJACK_BET))
+                .thenReturn(List.of(orphanBet(20, KEY)));
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.of(inPlay(Bet.TWENTY, KEY)));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(60L);
+
+        service.table(USER_ID);
+
+        verify(handRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void aFinishedHandWithoutSettledAtIsPaidAndThenSettled() {
+        BlackjackHand won = won();
+        when(handRepository.findUnsettledByUserId(USER_ID)).thenReturn(List.of(won));
+        when(walletService.credit(USER_ID, 40, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY))
+                .thenReturn(movement(40, 120));
+        when(handRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(120L);
+
+        service.table(USER_ID);
+
+        InOrder order = inOrder(walletService, handRepository);
+        order.verify(walletService).credit(USER_ID, 40, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY);
+        order.verify(handRepository).saveAndFlush(won);
+        assertTrue(won.isSettled());
+    }
+
+    @Test
+    void whenThePayoutAlreadyExistsTheHandIsSettledOnceWithoutPayingTwice() {
+        BlackjackHand won = won();
+        TokenTransaction previous = new TokenTransaction(UUID.randomUUID(), 40, TransactionType.BLACKJACK_PAYOUT, 120,
+                PAYOUT_KEY, NOW);
+        when(handRepository.findUnsettledByUserId(USER_ID)).thenReturn(List.of(won));
+        when(walletService.credit(USER_ID, 40, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY)).thenReturn(previous);
+        when(handRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(120L);
+
+        service.table(USER_ID);
+
+        verify(walletService, times(1)).credit(any(), anyLong(), any(), any());
+        verify(handRepository, times(1)).saveAndFlush(won);
+        assertTrue(won.isSettled());
+    }
+
+    @Test
+    void anUnsettledLossIsSettledWithoutACredit() {
+        BlackjackHand lost = inPlay(Bet.TEN, KEY, "TS", "TD", "7H", "9C");
+        lost.play(BlackjackRules.stand(lost.table()), NOW);
+        when(handRepository.findUnsettledByUserId(USER_ID)).thenReturn(List.of(lost));
+        when(handRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(90L);
+
+        service.table(USER_ID);
+
+        verify(walletService, never()).credit(any(), anyLong(), any(), any());
+        assertTrue(lost.isSettled());
+    }
+
+    @Test
+    void anUnsettledVoidHandIsRefundedInFull() {
+        BlackjackHand voided = withId(BlackjackHand.voided(USER_ID, KEY, Bet.FIFTY, NOW));
+        when(handRepository.findUnsettledByUserId(USER_ID)).thenReturn(List.of(voided));
+        when(walletService.credit(USER_ID, 50, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY))
+                .thenReturn(movement(50, 100));
+        when(handRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(100L);
+
+        service.table(USER_ID);
+
+        verify(walletService).credit(USER_ID, 50, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY);
+        assertTrue(voided.isSettled());
+    }
+
+    @Test
+    void anOptimisticClashWhileSettlingRereadsInsteadOfFailing() {
+        BlackjackHand won = won();
+        BlackjackHand alreadySettled = won();
+        alreadySettled.settle(NOW);
+        when(handRepository.findUnsettledByUserId(USER_ID)).thenReturn(List.of(won));
+        when(walletService.credit(USER_ID, 40, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY))
+                .thenReturn(movement(40, 120));
+        when(handRepository.saveAndFlush(won))
+                .thenThrow(new ObjectOptimisticLockingFailureException(BlackjackHand.class, HAND_ID));
+        when(handRepository.findByIdAndUserId(HAND_ID, USER_ID)).thenReturn(Optional.of(alreadySettled));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(120L);
+
+        BlackjackResponse response = service.table(USER_ID);
+
+        assertNull(response.hand());
+        verify(handRepository).findByIdAndUserId(HAND_ID, USER_ID);
+    }
+
+    @Test
+    void aWalletConflictWhilePayingLeavesTheHandUnsettledForTheNextCall() {
+        BlackjackHand won = won();
+        when(handRepository.findUnsettledByUserId(USER_ID)).thenReturn(List.of(won));
+        when(walletService.credit(USER_ID, 40, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY))
+                .thenThrow(new WalletConflictException());
+
+        assertThrows(WalletConflictException.class, () -> service.table(USER_ID));
+
+        assertFalse(won.isSettled());
+        verify(handRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void tableReconcilesBeforeItAnswers() {
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.getBalance(USER_ID)).thenReturn(100L);
+
+        service.table(USER_ID);
+
+        InOrder order = inOrder(walletService, handRepository);
+        order.verify(handRepository).findUnsettledByUserId(USER_ID);
+        order.verify(handRepository).findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN);
+    }
+
+    @Test
+    void dealReconcilesBeforeItLooksForAReplay() {
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.of(inPlay(Bet.TWENTY, KEY)));
+        when(walletService.getBalance(USER_ID)).thenReturn(80L);
+
+        service.deal(USER_ID, Bet.TWENTY, KEY);
+
+        InOrder order = inOrder(walletService, handRepository);
+        order.verify(handRepository).findUnsettledByUserId(USER_ID);
+        order.verify(handRepository).findByUserIdAndIdempotencyKey(USER_ID, KEY);
+    }
+
+    @Test
+    void hitAndStandReconcileBeforeTheyLoadTheHand() {
+        when(handRepository.findByIdAndUserId(HAND_ID, USER_ID)).thenReturn(Optional.empty());
+
+        assertThrows(HandNotFoundException.class, () -> service.hit(USER_ID, HAND_ID));
+        assertThrows(HandNotFoundException.class, () -> service.stand(USER_ID, HAND_ID));
+
+        InOrder order = inOrder(handRepository);
+        order.verify(handRepository).findUnsettledByUserId(USER_ID);
+        order.verify(handRepository).findByIdAndUserId(HAND_ID, USER_ID);
+        order.verify(handRepository).findUnsettledByUserId(USER_ID);
+        order.verify(handRepository).findByIdAndUserId(HAND_ID, USER_ID);
+    }
+
+    @Test
+    void aReplayAfterACrashBetweenDebitAndInsertReturnsTheAdoptedHandWithoutASecondDebit() {
+        stack("9S", "KD", "8H", "5C");
+        BlackjackHand adopted = inPlay(Bet.TWENTY, KEY);
+        when(walletService.spentOn(USER_ID, TransactionType.BLACKJACK_BET)).thenReturn(20L);
+        when(handRepository.sumBetByUserId(USER_ID)).thenReturn(0L);
+        when(walletService.movementsOf(USER_ID, TransactionType.BLACKJACK_BET))
+                .thenReturn(List.of(orphanBet(20, KEY)));
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.empty(), Optional.of(adopted));
+        when(handRepository.saveAndFlush(any())).thenAnswer(call -> withId(call.getArgument(0)));
+        when(walletService.getBalance(USER_ID)).thenReturn(80L);
+
+        HandResponse response = service.deal(USER_ID, Bet.TWENTY, KEY);
+
+        assertEquals(adopted.getId(), response.hand().id());
+        verify(walletService, never()).debit(any(), anyLong(), any(), any());
+        verify(handRepository, times(1)).saveAndFlush(any());
+    }
+
+    private BlackjackHand won() {
+        BlackjackHand hand = inPlay(Bet.TWENTY, KEY, "TS", "6D", "9H", "5C", "4D", "3H");
+        hand.play(BlackjackRules.stand(hand.table()), NOW);
+        return hand;
+    }
+
+    private static TokenTransaction orphanBet(long chips, UUID key) {
+        return new TokenTransaction(UUID.randomUUID(), -chips, TransactionType.BLACKJACK_BET, 100 - chips,
+                "blackjack-bet:" + key, NOW);
     }
 
     private void stack(String... codes) {
