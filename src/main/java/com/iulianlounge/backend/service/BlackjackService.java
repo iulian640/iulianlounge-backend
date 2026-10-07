@@ -33,6 +33,8 @@ public class BlackjackService {
 
     static final String BET_KEY_PREFIX = "blackjack-bet:";
     static final String PAYOUT_KEY_PREFIX = "blackjack-payout:";
+    private static final String TABLE_CONSTRAINT = "blackjack_hand_one_in_progress";
+    private static final String KEY_CONSTRAINT = "blackjack_hand_user_idempotency_key";
 
     private final WalletService walletService;
     private final BlackjackHandRepository handRepository;
@@ -138,13 +140,41 @@ public class BlackjackService {
             return Optional.of(handRepository.saveAndFlush(
                     new BlackjackHand(userId, idempotencyKey, bet, table, clock.instant())));
         } catch (DataIntegrityViolationException clash) {
+            boolean tableTaken = violates(clash, TABLE_CONSTRAINT);
+            if (!tableTaken && !violates(clash, KEY_CONSTRAINT)) {
+                throw clash;
+            }
             Optional<BlackjackHand> winner = handRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
             if (winner.isPresent()) {
                 return winner;
             }
-            settle(handRepository.saveAndFlush(BlackjackHand.voided(userId, idempotencyKey, bet, clock.instant())));
-            return Optional.empty();
+            if (!tableTaken) {
+                throw clash;
+            }
+            return voidTheBet(userId, idempotencyKey, bet);
         }
+    }
+
+    private Optional<BlackjackHand> voidTheBet(UUID userId, UUID idempotencyKey, Bet bet) {
+        BlackjackHand voided;
+        try {
+            voided = handRepository.saveAndFlush(BlackjackHand.voided(userId, idempotencyKey, bet, clock.instant()));
+        } catch (DataIntegrityViolationException clash) {
+            return Optional.of(handRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
+                    .orElseThrow(() -> clash));
+        }
+        settle(voided);
+        return Optional.empty();
+    }
+
+    private static boolean violates(Throwable error, String constraint) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.contains(constraint)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private BlackjackHand settleIfFinished(BlackjackHand hand) {

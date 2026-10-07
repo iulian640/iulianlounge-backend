@@ -282,6 +282,89 @@ class BlackjackServiceTest {
     }
 
     @Test
+    void aViolationOfAnotherConstraintPropagatesInsteadOfPassingForATakenTable() {
+        stack("9S", "KD", "8H", "5C");
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY)).thenReturn(Optional.empty());
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.debit(USER_ID, 20, TransactionType.BLACKJACK_BET, BET_KEY)).thenReturn(movement(-20, 80));
+        when(handRepository.saveAndFlush(any()))
+                .thenThrow(new DataIntegrityViolationException("blackjack_hand_bet_check"));
+
+        assertThrows(DataIntegrityViolationException.class, () -> service.deal(USER_ID, Bet.TWENTY, KEY));
+
+        verify(handRepository, times(1)).saveAndFlush(any());
+        verify(walletService, never()).credit(any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void aKeyViolationWithoutAWinnerPropagatesInsteadOfVoidingTheHand() {
+        stack("9S", "KD", "8H", "5C");
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY)).thenReturn(Optional.empty());
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.debit(USER_ID, 20, TransactionType.BLACKJACK_BET, BET_KEY)).thenReturn(movement(-20, 80));
+        when(handRepository.saveAndFlush(any()))
+                .thenThrow(new DataIntegrityViolationException("blackjack_hand_user_idempotency_key"));
+
+        assertThrows(DataIntegrityViolationException.class, () -> service.deal(USER_ID, Bet.TWENTY, KEY));
+
+        verify(handRepository, times(1)).saveAndFlush(any());
+        verify(walletService, never()).credit(any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void theConstraintNameIsFoundInTheRootCauseOfTheViolation() {
+        stack("9S", "KD", "8H", "5C");
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY)).thenReturn(Optional.empty());
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.debit(USER_ID, 20, TransactionType.BLACKJACK_BET, BET_KEY)).thenReturn(movement(-20, 80));
+        when(handRepository.saveAndFlush(any()))
+                .thenThrow(new DataIntegrityViolationException("could not execute statement",
+                        new IllegalStateException("duplicate key value violates unique constraint "
+                                + "\"blackjack_hand_one_in_progress\"")))
+                .thenAnswer(call -> withId(call.getArgument(0)));
+        when(walletService.credit(USER_ID, 20, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY))
+                .thenReturn(movement(20, 100));
+
+        assertThrows(HandInProgressException.class, () -> service.deal(USER_ID, Bet.TWENTY, KEY));
+
+        verify(walletService).credit(USER_ID, 20, TransactionType.BLACKJACK_PAYOUT, PAYOUT_KEY);
+    }
+
+    @Test
+    void aKeyClashWhileVoidingTheHandReturnsTheHandOfTheOtherRequest() {
+        stack("9S", "KD", "8H", "5C");
+        BlackjackHand other = inPlay(Bet.TWENTY, KEY);
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.empty(), Optional.empty(), Optional.of(other));
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.debit(USER_ID, 20, TransactionType.BLACKJACK_BET, BET_KEY)).thenReturn(movement(-20, 80));
+        when(handRepository.saveAndFlush(any()))
+                .thenThrow(new DataIntegrityViolationException("blackjack_hand_one_in_progress"))
+                .thenThrow(new DataIntegrityViolationException("blackjack_hand_user_idempotency_key"));
+        when(walletService.getBalance(USER_ID)).thenReturn(80L);
+
+        HandResponse response = service.deal(USER_ID, Bet.TWENTY, KEY);
+
+        assertEquals(other.getId(), response.hand().id());
+        verify(walletService, never()).credit(any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void aClashWhileVoidingWithNoHandToBeFoundPropagates() {
+        stack("9S", "KD", "8H", "5C");
+        when(handRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY)).thenReturn(Optional.empty());
+        when(handRepository.findByUserIdAndStatus(USER_ID, HandStatus.PLAYER_TURN)).thenReturn(Optional.empty());
+        when(walletService.debit(USER_ID, 20, TransactionType.BLACKJACK_BET, BET_KEY)).thenReturn(movement(-20, 80));
+        when(handRepository.saveAndFlush(any()))
+                .thenThrow(new DataIntegrityViolationException("blackjack_hand_one_in_progress"))
+                .thenThrow(new DataIntegrityViolationException("blackjack_hand_user_idempotency_key"));
+
+        assertThrows(DataIntegrityViolationException.class, () -> service.deal(USER_ID, Bet.TWENTY, KEY));
+
+        verify(walletService, never()).credit(any(), anyLong(), any(), any());
+    }
+
+    @Test
     void hittingUntilBustSettlesALossWithoutCredit() {
         BlackjackHand hand = inPlay(Bet.TWENTY, KEY, "TS", "KD", "6H", "5C", "KC");
         when(handRepository.findByIdAndUserId(HAND_ID, USER_ID)).thenReturn(Optional.of(hand));
