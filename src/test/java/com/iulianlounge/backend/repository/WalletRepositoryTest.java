@@ -10,6 +10,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -121,6 +123,12 @@ class WalletRepositoryTest {
                 .getContent();
 
         assertEquals(List.of(105L, 100L), history.stream().map(TokenTransaction::getBalanceAfter).toList());
+    }
+
+    @ParameterizedTest
+    @EnumSource(TransactionType.class)
+    void everyMovementTypeFitsTheDatabaseCheck(TransactionType type) {
+        transactionRepository.saveAndFlush(new TokenTransaction(wallet.getId(), 10, type, 10, null, NOW));
     }
 
     private TokenTransaction welcome(Wallet target, String idempotencyKey) {
