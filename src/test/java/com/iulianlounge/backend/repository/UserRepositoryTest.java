@@ -1,6 +1,7 @@
 package com.iulianlounge.backend.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -63,6 +64,22 @@ class UserRepositoryTest {
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> userRepository.saveAndFlush(newUser("otro", "CURSAITO@Lounge.com")));
+    }
+
+    @Test
+    void aDuplicateEmailStillFailsAndTheErrorNamesTheIndexButNeverTheEmail() {
+        userRepository.saveAndFlush(newUser("cursaito", "cursaito@lounge.com"));
+
+        DataIntegrityViolationException error = assertThrows(DataIntegrityViolationException.class,
+                () -> userRepository.saveAndFlush(newUser("otro", "CURSAITO@Lounge.com")));
+
+        Throwable cause = error;
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        String message = cause.getMessage().toLowerCase();
+        assertTrue(message.contains("users_email_lower_key"), message);
+        assertFalse(message.contains("cursaito@lounge.com"), message);
     }
 
     @Test

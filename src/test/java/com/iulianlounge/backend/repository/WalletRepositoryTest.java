@@ -1,6 +1,7 @@
 package com.iulianlounge.backend.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -145,6 +146,18 @@ class WalletRepositoryTest {
     @CsvSource({"BAR_ORDER, 10", "WELCOME_BONUS, -10", "HOUSE_CREDIT, -10"})
     void databaseRejectsAMovementWhoseSignDoesNotMatchItsType(String type, long amount) {
         assertViolates("token_transaction_amount_sign_check", () -> insertMovement(type, amount));
+    }
+
+    @Test
+    void aViolationNamesTheConstraintButCarriesNoRowValues() {
+        PersistenceException error = assertThrows(PersistenceException.class, () -> insertMovement("BAR_ORDER", 10));
+
+        Throwable cause = error;
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        assertTrue(cause.getMessage().contains("token_transaction_amount_sign_check"), cause.getMessage());
+        assertFalse(cause.getMessage().contains("Failing row"), cause.getMessage());
     }
 
     @Test
