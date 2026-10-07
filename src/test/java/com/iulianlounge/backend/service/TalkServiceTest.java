@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -273,8 +276,32 @@ class TalkServiceTest {
         TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertBusy(response);
+        assertTrue(output.getOut().contains("reason=unexpected"), output.getOut());
         assertFalse(output.getAll().contains("SECRETO-USUARIO"), output.getAll());
         assertFalse(output.getAll().contains(HELLO), output.getAll());
+    }
+
+    @Test
+    void aClientThatReturnsNothingIsTheBusyLine(CapturedOutput output) {
+        LlmClient nothing = (systemPrompt, turns) -> null;
+        talkService = new TalkService(barFacts, userRepository, nothing, new BarmanPrompt(), budget, memory);
+        member(Language.ES);
+
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
+
+        assertBusy(response);
+        assertTrue(output.getOut().contains("reason=unexpected"), output.getOut());
+    }
+
+    @Test
+    void aBugOfOursWhileRememberingTheAnswerIsNotHiddenAsTheBusyLine() {
+        TalkMemory broken = spy(memory);
+        doThrow(new IllegalStateException("bug")).when(broken).remember(any(), any(), any());
+        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(), budget, broken);
+        member(Language.ES);
+        llm.willReply("Claro.");
+
+        assertThrows(IllegalStateException.class, () -> talkService.talk(USER_ID, HELLO, null, IP));
     }
 
     @Test

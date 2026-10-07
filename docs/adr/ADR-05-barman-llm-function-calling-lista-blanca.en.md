@@ -253,7 +253,7 @@ Accepted on 2026-10-07. It amends this ADR and ADR-06, and cancels the
    - Logs: never the content of messages or answers, nor headers. Per call
      only: result (`ok` or a reason from a closed list: `disabled`, `timeout`,
      `network`, `http_4xx`, `http_5xx`, `parse`, `empty`, `budget`,
-     `member_cap`, `ip_cap`), HTTP status, `stop_reason`, latency and tokens.
+     `member_cap`, `ip_cap`, `unexpected`), HTTP status, `stop_reason`, latency and tokens.
      `LlmUnavailableException` is created **with no chained cause**, so no
      trace drags pieces of the body along. `ANTHROPIC_LOG` is never enabled in
      prod.

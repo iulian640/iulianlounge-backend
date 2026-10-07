@@ -5,7 +5,7 @@ import java.util.Locale;
 public class LlmUnavailableException extends RuntimeException {
 
     public enum Reason {
-        DISABLED, TIMEOUT, NETWORK, HTTP_4XX, HTTP_5XX, PARSE, EMPTY, BUDGET, MEMBER_CAP, IP_CAP;
+        DISABLED, TIMEOUT, NETWORK, HTTP_4XX, HTTP_5XX, PARSE, EMPTY, BUDGET, MEMBER_CAP, IP_CAP, UNEXPECTED;
 
         public String code() {
             return name().toLowerCase(Locale.ROOT);

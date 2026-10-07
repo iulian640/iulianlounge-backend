@@ -26,7 +26,6 @@ public class TalkService {
     private static final Logger log = LoggerFactory.getLogger(TalkService.class);
 
     private static final String EMPTY = "empty";
-    private static final String UNEXPECTED = "unexpected";
 
     private final BarFacts barFacts;
     private final UserRepository userRepository;
@@ -51,19 +50,33 @@ public class TalkService {
         Language language = requested != null ? requested : user.getLocale();
         String systemPrompt = barmanPrompt.build(facts, language);
         List<LlmTurn> turns = withNewMessage(talkMemory.recent(userId), text);
+        LlmReply reply;
         try {
-            LlmReply reply = talkBudget.spend(userId, remoteAddress, () -> llmClient.reply(systemPrompt, turns));
-            String answer = TalkText.clean(reply.text());
-            if (answer.isEmpty()) {
-                return busy(facts, EMPTY);
-            }
-            talkMemory.remember(userId, text, answer);
-            return TalkResponse.llm(answer);
+            reply = talkBudget.spend(userId, remoteAddress, () -> callClient(systemPrompt, turns));
         } catch (LlmUnavailableException e) {
             return busy(facts, e.reason().code());
-        } catch (RuntimeException e) {
-            return busy(facts, UNEXPECTED);
         }
+        String answer = TalkText.clean(reply.text());
+        if (answer.isEmpty()) {
+            return busy(facts, EMPTY);
+        }
+        talkMemory.remember(userId, text, answer);
+        return TalkResponse.llm(answer);
+    }
+
+    private LlmReply callClient(String systemPrompt, List<LlmTurn> turns) {
+        LlmReply reply;
+        try {
+            reply = llmClient.reply(systemPrompt, turns);
+        } catch (LlmUnavailableException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new LlmUnavailableException(LlmUnavailableException.Reason.UNEXPECTED);
+        }
+        if (reply == null) {
+            throw new LlmUnavailableException(LlmUnavailableException.Reason.UNEXPECTED);
+        }
+        return reply;
     }
 
     private static List<LlmTurn> withNewMessage(List<LlmTurn> window, String text) {

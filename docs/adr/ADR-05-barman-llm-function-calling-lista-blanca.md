@@ -254,7 +254,7 @@ Aceptada el 2026-10-07. Enmienda esta ADR y ADR-06, y anula la alternativa
    - Logs: nunca el contenido de mensajes ni respuestas, ni cabeceras. Por
      llamada solo: resultado (`ok` o un motivo de una lista cerrada:
      `disabled`, `timeout`, `network`, `http_4xx`, `http_5xx`, `parse`,
-     `empty`, `budget`, `member_cap`, `ip_cap`), estado HTTP, `stop_reason`,
+     `empty`, `budget`, `member_cap`, `ip_cap`, `unexpected`), estado HTTP, `stop_reason`,
      latencia y tokens. `LlmUnavailableException` se crea **sin causa
      encadenada**, para que ninguna traza arrastre trozos del cuerpo.
      `ANTHROPIC_LOG` nunca se activa en prod.
