@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       # Solo en esta máquina: Docker se salta el firewall, y 0.0.0.0 publicaría la BD a toda la red
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - lounge-data:/var/lib/postgresql/data
 
