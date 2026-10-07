@@ -83,6 +83,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
         if (response != null && response.getBody() instanceof ProblemDetail problem && !hasCode(problem)) {
             problem.setProperty(ErrorCode.PROPERTY, ErrorCode.REQUEST_REJECTED.key());
+            problem.setDetail(ErrorCode.REQUEST_REJECTED.detail());
         }
         return response;
     }

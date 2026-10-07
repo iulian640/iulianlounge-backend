@@ -1,8 +1,10 @@
 package com.iulianlounge.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -15,7 +17,9 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -157,14 +161,35 @@ class WalletServiceTest {
                 () -> walletService.debit(USER_ID, 30, TransactionType.WELCOME_BONUS, "clave-1"));
     }
 
-    @Test
-    void creditRefusesToJoinSomeoneElsesTransaction() {
-        TransactionSynchronizationManager.setActualTransactionActive(true);
-        try {
+    @Nested
+    class InsideSomeoneElsesTransaction {
+
+        @BeforeEach
+        void openAnOuterTransaction() {
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+        }
+
+        @AfterEach
+        void closeIt() {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+
+        @Test
+        void creditRefusesToRun() {
             assertThrows(IllegalStateException.class,
                     () -> walletService.credit(USER_ID, 10, TransactionType.WELCOME_BONUS, null));
-        } finally {
-            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+
+        @Test
+        void creditIfRefusesToRun() {
+            assertThrows(IllegalStateException.class,
+                    () -> walletService.creditIf(USER_ID, 10, TransactionType.HOUSE_CREDIT, "dia-1", balance -> true));
+        }
+
+        @Test
+        void debitRefusesToRun() {
+            assertThrows(IllegalStateException.class,
+                    () -> walletService.debit(USER_ID, 10, TransactionType.BAR_ORDER, null));
         }
     }
 
@@ -194,6 +219,58 @@ class WalletServiceTest {
     }
 
     @Test
+    void creditIfAppliesTheCreditWhileTheBalanceAllowsIt() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(3)));
+        when(walletRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(transactionRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+
+        Optional<TokenTransaction> movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT,
+                "dia-1", balance -> balance < 5);
+
+        assertEquals(53, movement.orElseThrow().getBalanceAfter());
+    }
+
+    @Test
+    void creditIfGivesNothingWhenTheBalanceDoesNotAllowIt() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+
+        Optional<TokenTransaction> movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT,
+                "dia-1", balance -> balance < 5);
+
+        assertTrue(movement.isEmpty());
+        verify(transactionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void creditIfChecksTheBalanceAgainWhenItRetriesAfterAConflict() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(3)), Optional.of(walletWith(50)));
+        when(walletRepository.saveAndFlush(any()))
+                .thenThrow(new ObjectOptimisticLockingFailureException(Wallet.class, WALLET_ID));
+
+        Optional<TokenTransaction> movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT,
+                "dia-2", balance -> balance < 5);
+
+        assertTrue(movement.isEmpty());
+        verify(walletRepository, times(1)).saveAndFlush(any());
+        verify(transactionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void creditIfWithAnAlreadyUsedKeyReturnsThatMovementWithoutAskingTheCondition() {
+        TokenTransaction previous = new TokenTransaction(WALLET_ID, 50, TransactionType.HOUSE_CREDIT, 50, "dia-3", NOW);
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+        when(transactionRepository.findByWalletIdAndIdempotencyKey(WALLET_ID, "dia-3")).thenReturn(Optional.of(previous));
+
+        Optional<TokenTransaction> movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT,
+                "dia-3", balance -> {
+                    throw new AssertionError("the condition must not be asked for a repeated key");
+                });
+
+        assertSame(previous, movement.orElseThrow());
+        verify(walletRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void userWithoutWalletIsAnError() {
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
 
@@ -205,6 +282,53 @@ class WalletServiceTest {
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(123)));
 
         assertEquals(123, walletService.getBalance(USER_ID));
+    }
+
+    @Test
+    void spentOnTurnsTheDebitsOfATypeIntoAPositiveAmount() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+        when(transactionRepository.sumAmountByWalletIdAndType(WALLET_ID, TransactionType.BAR_ORDER))
+                .thenReturn(-50L);
+
+        assertEquals(50, walletService.spentOn(USER_ID, TransactionType.BAR_ORDER));
+    }
+
+    @Test
+    void spentOnIsZeroForAUserWithoutWallet() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+        assertEquals(0, walletService.spentOn(USER_ID, TransactionType.BAR_ORDER));
+    }
+
+    @Test
+    void hasMovementFindsAKeyInTheUsersWallet() {
+        String key = "house-credit:2026-10-07";
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+        when(transactionRepository.findByWalletIdAndIdempotencyKey(WALLET_ID, key)).thenReturn(Optional.of(
+                new TokenTransaction(WALLET_ID, 50, TransactionType.HOUSE_CREDIT, 50, key, NOW)));
+
+        assertTrue(walletService.hasMovement(USER_ID, key));
+    }
+
+    @Test
+    void hasMovementIsFalseWhenTheKeyIsNotInTheWallet() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+        when(transactionRepository.findByWalletIdAndIdempotencyKey(WALLET_ID, "house-credit:2026-10-07"))
+                .thenReturn(Optional.empty());
+
+        assertFalse(walletService.hasMovement(USER_ID, "house-credit:2026-10-07"));
+    }
+
+    @Test
+    void hasMovementNeedsAKeyBecauseTheWelcomeBonusHasNone() {
+        assertThrows(NullPointerException.class, () -> walletService.hasMovement(USER_ID, null));
+    }
+
+    @Test
+    void hasMovementIsFalseForAUserWithoutWallet() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+        assertFalse(walletService.hasMovement(USER_ID, "house-credit:2026-10-07"));
     }
 
     private static Wallet walletWith(long balance) {

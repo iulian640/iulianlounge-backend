@@ -117,11 +117,15 @@ sequenceDiagram
 
 ### Data model
 
-Only `users` exists today (migrations V1 to V3). The wallet and ledger arrive
-in V4.
+Three tables after migrations V1 to V6. Every constraint and index, the domain
+and layer class diagrams and the drink-ordering sequence are in
+[docs/diagramas.md](docs/diagramas.md) (Spanish).
 
 ```mermaid
 erDiagram
+    users ||--o| wallet : "wallet.user_id"
+    wallet ||--o{ token_transaction : "token_transaction.wallet_id"
+
     users {
         uuid id PK
         varchar username UK "50, [A-Za-z0-9_.-]"
@@ -131,6 +135,24 @@ erDiagram
         text locale "CHECK: es, en"
         timestamptz created_at
         timestamptz last_seen_at
+    }
+
+    wallet {
+        uuid id PK
+        uuid user_id FK,UK "ON DELETE CASCADE"
+        bigint balance "CHECK >= 0"
+        bigint version "optimistic lock"
+        timestamptz created_at
+    }
+
+    token_transaction {
+        uuid id PK
+        uuid wallet_id FK "ON DELETE RESTRICT"
+        bigint amount "signed, BAR_ORDER always < 0"
+        text type "WELCOME_BONUS, BAR_ORDER, HOUSE_CREDIT"
+        bigint balance_after "CHECK >= 0"
+        text idempotency_key "unique per wallet, max 64"
+        timestamptz created_at
     }
 ```
 

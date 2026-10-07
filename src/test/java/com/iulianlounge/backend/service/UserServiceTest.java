@@ -12,9 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.iulianlounge.backend.domain.Rank;
 import com.iulianlounge.backend.domain.Language;
-import com.iulianlounge.backend.domain.Role;
+import com.iulianlounge.backend.domain.Rank;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.MeResponse;
 import com.iulianlounge.backend.exception.InvalidTokenException;
@@ -26,20 +25,21 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
 
-    @Test
-    void getProfileReturnsUserDataWithStartingRank() {
-        User user = new User();
-        user.setId(UUID.randomUUID());
-        user.setUsername("cursaito");
-        user.setLocale(Language.ES);
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+    @Mock
+    private BarService barService;
 
-        MeResponse profile = new UserService(userRepository).getProfile(user.getId());
+    @Test
+    void getProfileReturnsUserDataWithItsRank() {
+        User user = cursaito();
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(barService.rankOf(user.getId())).thenReturn(Rank.HABITUAL);
+
+        MeResponse profile = new UserService(userRepository, barService).getProfile(user.getId());
 
         assertEquals(user.getId(), profile.userId());
         assertEquals("cursaito", profile.username());
         assertEquals("es", profile.locale());
-        assertEquals(Rank.NADIE, profile.rank());
+        assertEquals(Rank.HABITUAL, profile.rank());
     }
 
     @Test
@@ -47,6 +47,15 @@ class UserServiceTest {
         UUID deleted = UUID.randomUUID();
         when(userRepository.findById(deleted)).thenReturn(Optional.empty());
 
-        assertThrows(InvalidTokenException.class, () -> new UserService(userRepository).getProfile(deleted));
+        assertThrows(InvalidTokenException.class,
+                () -> new UserService(userRepository, barService).getProfile(deleted));
+    }
+
+    private static User cursaito() {
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setUsername("cursaito");
+        user.setLocale(Language.ES);
+        return user;
     }
 }

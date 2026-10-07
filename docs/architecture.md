@@ -3,12 +3,31 @@
 > Documento de diseño. Complementa a [`CONCEPT.md`](../CONCEPT.md) (concepto de producto).
 > Objetivo: arquitectura por capas clásica de Spring, sin sobreingeniería, con la
 > economía de fichas como núcleo transaccional del sistema.
-> Última revisión: 2026-09-25 (estado tras el sprint 8, respuestas sin
-> envoltorio, errores con `code`, endpoints de auth y `/me`).
+> Última revisión: 2026-10-07. Este documento es el **diseño completo de Fase 0**: describe más de lo
+> que existe. Lo implementado, dibujado desde el código y las migraciones, está en
+> [`diagramas.md`](diagramas.md).
 
 **Decisión transversal previa a todo**: las fichas se representan como enteros (`BIGINT` / `long`), nunca decimales ni `double`. Toda mutación de saldo pasa por un único servicio (`WalletService`) y queda registrada en un ledger append-only. Todo lo demás del sistema (blackjack, katas, tienda, incremental, préstamos) son *clientes* de ese servicio.
 
-**Estado de implementación (2026-09-25, sprint 8 cerrado):** hecho el esqueleto (Spring Boot 4.1, PostgreSQL 17 en Docker, CI con JaCoCo al 80 %) y la autenticación completa: registro, login, refresh con cookie `HttpOnly`, logout, filtro JWT y `GET /me` (IUL-18 a IUL-21, ADR-08). Errores con `code` estable y enum `ErrorCode` (ADR-06). Migraciones V1 (`users`), V2 (email único sin distinguir mayúsculas) y V3 (`CHECK` de `role` y `locale`). Siguiente: cartera y ledger (V4, sprint 9). Blackjack, retos, tienda, incremental y social quedan fuera del PMV (épica IUL-54): sus secciones se conservan como diseño, no como plan. Flujo git: ramas feature desde `dev`, y `main` se iguala a `dev` al cerrar cada ticket.
+**Estado de implementación (2026-10-07, sprint 10):**
+
+- Esqueleto: Spring Boot 4.1, PostgreSQL 17 en Docker, CI con JaCoCo al 80 %.
+- Autenticación completa (ADR-08): registro, login, refresh con cookie `HttpOnly`, logout, filtro JWT, `GET /me` y rate limit en login y registro.
+- Errores con `code` estable y enum `ErrorCode` (ADR-06).
+- Cartera con ledger append-only y bono de bienvenida (ADR-04).
+- **La Barra (ADR-10):** carta fija, pedido idempotente que se cobra del wallet, rango derivado de lo gastado y fiado diario de la casa.
+- Migraciones:
+
+  | Migración | Qué hace |
+  |---|---|
+  | V1 | `users` |
+  | V2 | email único sin distinguir mayúsculas |
+  | V3 | `CHECK` de `role` y `locale` |
+  | V4 | `wallet` y `token_transaction` |
+  | V5 | tipos de movimiento de la barra |
+  | V6 | índice del gasto y signo ligado al tipo |
+
+- Fuera del PMV (épica IUL-54): blackjack, retos, tienda, incremental, social y la deuda del préstamo. Sus secciones se conservan como diseño, no como plan.
 
 ---
 
@@ -19,7 +38,7 @@
 | Entidad | Campos principales | Relaciones | Justificación |
 |---|---|---|---|
 | **User** | id (UUID), username (unique), email (unique **case-insensitive**: índice único sobre `lower(email)`, migración V2; el servicio normaliza a minúsculas al registrar), passwordHash, role (enum USER/ADMIN), locale (enum ES/EN), createdAt, lastSeenAt | 1:1 Wallet, 1:1 UserProgress | `lastSeenAt` alimenta la presencia asíncrona sin tabla extra. Locale en servidor para emails/barman. **Implementada (IUL-17).** |
-| **UserProgress** | id, user (1:1), rank (enum PEJILGERO/PARROQUIANO/DE_LA_CASA/SOCIO — los rangos de la ficción, ver [`ficcion.md`](ficcion.md)), xp (long), currentStreak, bestStreak, lastActivityType (enum), lastActivityAt, prestigeCount, prestigeMultiplier (int, puntos básicos: 10500 = x1.05) | ManyToOne User | Concentra la narrativa de ascenso. Separado de User para que las lecturas de auth no arrastren datos de juego. El multiplicador de prestigio como entero (puntos básicos) evita floats en la economía. |
+| **UserProgress** *(diseño; en el PMV no existe: el rango es el enum `Rank` NADIE/HABITUAL/CONFIANZA/SOCIO, derivado de lo gastado en la barra, ADR-10)* | id, user (1:1), rank (enum PEJILGERO/PARROQUIANO/DE_LA_CASA/SOCIO — los rangos de la ficción, ver [`ficcion.md`](ficcion.md)), xp (long), currentStreak, bestStreak, lastActivityType (enum), lastActivityAt, prestigeCount, prestigeMultiplier (int, puntos básicos: 10500 = x1.05) | ManyToOne User | Concentra la narrativa de ascenso. Separado de User para que las lecturas de auth no arrastren datos de juego. El multiplicador de prestigio como entero (puntos básicos) evita floats en la economía. |
 | **Room** | id, code (unique: SALON/BACKROOM/ETERNA — en la ficción El Salón, La Trastienda y La Eterna, ver [`ficcion.md`](ficcion.md)), requiredRank, unlockCostTokens, nameKey | — (catálogo) | Catálogo en BD sembrado por Flyway, no hardcodeado: permite añadir salas sin desplegar. `nameKey` es clave i18n, el texto vive en el frontend. Decisión 2026-07-04: el blackjack se juega EN El Salón; La Trastienda solo aloja el terminal de katas. |
 | **RoomUnlock** | id, user, room, unlockedAt | ManyToOne User, ManyToOne Room; unique(user, room) | Hecho inmutable de desbloqueo. La constraint única impide doble desbloqueo (y doble cobro). |
 
@@ -101,6 +120,10 @@ Sin tablas nuevas: son **vistas de lectura** sobre lo que ya existe.
 | room_unlock | UNIQUE (user_id, room_id) | Anti doble desbloqueo |
 
 ### 1.10 Diagrama ER (Mermaid)
+
+> **Diseño de Fase 0, no implementado salvo `users`, `wallet` y `token_transaction`** (y estas tres con
+> los tipos simplificados del diseño: en la BD real los ids son UUID). El ER real, sacado de las
+> migraciones V1-V6, está en [`diagramas.md`](diagramas.md#1-base-de-datos).
 
 ```mermaid
 erDiagram
@@ -298,6 +321,9 @@ erDiagram
 ---
 
 ## 2. Arquitectura backend (diagrama de clases)
+
+> **Diseño de Fase 0.** La mayoría de estas clases son de módulos fuera del PMV. Las clases que existen
+> hoy, con sus dependencias reales, están en [`diagramas.md`](diagramas.md).
 
 Capas clásicas: Controller (HTTP/DTOs/validación) → Service (reglas de negocio, transacciones) → Repository (Spring Data JPA). Regla de oro para el equipo (de una persona): **ningún controller toca un repository, y solo `WalletService` toca `WalletRepository` y `TokenTransactionRepository`**.
 

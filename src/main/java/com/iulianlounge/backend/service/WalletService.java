@@ -1,8 +1,10 @@
 package com.iulianlounge.backend.service;
 
 import java.time.Clock;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.LongPredicate;
 import java.util.function.Supplier;
 
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -53,6 +55,24 @@ public class WalletService {
         return withOneRetry(() -> applyTo(userId, amount, type, idempotencyKey));
     }
 
+    public Optional<TokenTransaction> creditIf(UUID userId, long amount, TransactionType type, String idempotencyKey,
+            LongPredicate allowedBalance) {
+        requireOwnTransaction();
+        requirePositive(amount);
+        Objects.requireNonNull(allowedBalance, "allowedBalance");
+        return withOneRetry(() -> {
+            Wallet wallet = findWallet(userId);
+            Optional<TokenTransaction> previous = previousMovement(wallet, amount, type, idempotencyKey);
+            if (previous.isPresent()) {
+                return previous;
+            }
+            if (!allowedBalance.test(wallet.getBalance())) {
+                return Optional.empty();
+            }
+            return Optional.of(apply(wallet, amount, type, idempotencyKey));
+        });
+    }
+
     public TokenTransaction debit(UUID userId, long amount, TransactionType type, String idempotencyKey) {
         requireOwnTransaction();
         requirePositive(amount);
@@ -63,24 +83,41 @@ public class WalletService {
         return findWallet(userId).getBalance();
     }
 
+    public long spentOn(UUID userId, TransactionType type) {
+        return walletRepository.findByUserId(userId)
+                .map(wallet -> -transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), type))
+                .orElse(0L);
+    }
+
+    public boolean hasMovement(UUID userId, String idempotencyKey) {
+        Objects.requireNonNull(idempotencyKey, "idempotencyKey");
+        return walletRepository.findByUserId(userId)
+                .flatMap(wallet -> transactionRepository.findByWalletIdAndIdempotencyKey(wallet.getId(), idempotencyKey))
+                .isPresent();
+    }
+
     public Page<TokenTransaction> getTransactions(UUID userId, Pageable pageable) {
         return transactionRepository.findByWalletIdOrderByCreatedAtDescIdDesc(findWallet(userId).getId(), pageable);
     }
 
     private TokenTransaction applyTo(UUID userId, long signedAmount, TransactionType type, String idempotencyKey) {
         Wallet wallet = findWallet(userId);
+        return previousMovement(wallet, signedAmount, type, idempotencyKey)
+                .orElseGet(() -> apply(wallet, signedAmount, type, idempotencyKey));
+    }
 
-        if (idempotencyKey != null) {
-            Optional<TokenTransaction> previous =
-                    transactionRepository.findByWalletIdAndIdempotencyKey(wallet.getId(), idempotencyKey);
-            if (previous.isPresent()) {
-                if (previous.get().getAmount() != signedAmount || previous.get().getType() != type) {
-                    throw new IdempotencyMismatchException();
-                }
-                return previous.get();
-            }
+    private Optional<TokenTransaction> previousMovement(Wallet wallet, long signedAmount, TransactionType type,
+            String idempotencyKey) {
+        if (idempotencyKey == null) {
+            return Optional.empty();
         }
-        return apply(wallet, signedAmount, type, idempotencyKey);
+        Optional<TokenTransaction> previous =
+                transactionRepository.findByWalletIdAndIdempotencyKey(wallet.getId(), idempotencyKey);
+        if (previous.isPresent()
+                && (previous.get().getAmount() != signedAmount || previous.get().getType() != type)) {
+            throw new IdempotencyMismatchException();
+        }
+        return previous;
     }
 
     private TokenTransaction apply(Wallet wallet, long signedAmount, TransactionType type, String idempotencyKey) {
@@ -96,7 +133,7 @@ public class WalletService {
                 wallet.getId(), signedAmount, type, newBalance, idempotencyKey, clock.instant()));
     }
 
-    private TokenTransaction withOneRetry(Supplier<TokenTransaction> movement) {
+    private <T> T withOneRetry(Supplier<T> movement) {
         try {
             return transactions.execute(status -> movement.get());
         } catch (OptimisticLockingFailureException firstClash) {
@@ -114,7 +151,7 @@ public class WalletService {
 
     private static void requireOwnTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("WalletService.credit/debit must run in its own transaction");
+            throw new IllegalStateException("WalletService.credit, creditIf and debit must run in their own transaction");
         }
     }
 

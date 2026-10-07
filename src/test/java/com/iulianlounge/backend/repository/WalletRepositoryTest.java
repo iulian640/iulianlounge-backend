@@ -2,6 +2,7 @@ package com.iulianlounge.backend.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -10,6 +11,10 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -121,6 +126,77 @@ class WalletRepositoryTest {
                 .getContent();
 
         assertEquals(List.of(105L, 100L), history.stream().map(TokenTransaction::getBalanceAfter).toList());
+    }
+
+    @ParameterizedTest
+    @EnumSource(TransactionType.class)
+    void everyMovementTypeFitsTheDatabaseCheck(TransactionType type) {
+        long amount = type == TransactionType.BAR_ORDER ? -10 : 10;
+
+        transactionRepository.saveAndFlush(new TokenTransaction(wallet.getId(), amount, type, 10, null, NOW));
+    }
+
+    @Test
+    void databaseRejectsAnUnknownMovementType() {
+        assertViolates("token_transaction_type_check", () -> insertMovement("PROPINA", 10));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"BAR_ORDER, 10", "WELCOME_BONUS, -10", "HOUSE_CREDIT, -10"})
+    void databaseRejectsAMovementWhoseSignDoesNotMatchItsType(String type, long amount) {
+        assertViolates("token_transaction_amount_sign_check", () -> insertMovement(type, amount));
+    }
+
+    @Test
+    void theNativeInsertUsedByTheseChecksWorksForAValidMovement() {
+        insertMovement("BAR_ORDER", -10);
+    }
+
+    @Test
+    void addsUpTheMovementsOfOneTypeInOneWallet() {
+        Wallet other = walletRepository.saveAndFlush(new Wallet(newUser("dwight").getId(), NOW));
+        transactionRepository.saveAndFlush(movement(wallet, 100, TransactionType.WELCOME_BONUS, 100));
+        transactionRepository.saveAndFlush(movement(wallet, -40, TransactionType.BAR_ORDER, 60));
+        transactionRepository.saveAndFlush(movement(wallet, -10, TransactionType.BAR_ORDER, 50));
+        transactionRepository.saveAndFlush(movement(other, -25, TransactionType.BAR_ORDER, 75));
+
+        long sum = transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), TransactionType.BAR_ORDER);
+
+        assertEquals(-50, sum);
+    }
+
+    @Test
+    void theSumIsZeroWithoutMovementsOfThatType() {
+        transactionRepository.saveAndFlush(movement(wallet, 100, TransactionType.WELCOME_BONUS, 100));
+
+        long sum = transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), TransactionType.BAR_ORDER);
+
+        assertEquals(0, sum);
+    }
+
+    private static void assertViolates(String constraint, Executable insert) {
+        PersistenceException error = assertThrows(PersistenceException.class, insert);
+        Throwable cause = error;
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        assertTrue(cause.getMessage().contains(constraint), cause.getMessage());
+    }
+
+    private void insertMovement(String type, long amount) {
+        entityManager.getEntityManager()
+                .createNativeQuery("""
+                        INSERT INTO token_transaction (id, wallet_id, amount, type, balance_after, created_at)
+                        VALUES (gen_random_uuid(), :walletId, :amount, :type, 10, now())
+                        """)
+                .setParameter("walletId", wallet.getId())
+                .setParameter("amount", amount)
+                .setParameter("type", type)
+                .executeUpdate();
+    }
+
+    private TokenTransaction movement(Wallet target, long amount, TransactionType type, long balanceAfter) {
+        return new TokenTransaction(target.getId(), amount, type, balanceAfter, null, NOW);
     }
 
     private TokenTransaction welcome(Wallet target, String idempotencyKey) {
