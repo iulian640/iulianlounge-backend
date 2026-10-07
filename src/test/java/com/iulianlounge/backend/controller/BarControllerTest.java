@@ -116,12 +116,13 @@ class BarControllerTest {
     }
 
     @Test
-    void anOrderWithAMalformedIdempotencyKeyIsRejected() throws Exception {
-        mockMvc.perform(order("not-a-uuid", """
+    void anOrderWithAMalformedIdempotencyKeyIsRejectedWithoutEchoingIt() throws Exception {
+        mockMvc.perform(order("<script>no-es-un-uuid</script>", """
                         {"drink":"SIDECAR"}
                         """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("request.rejected"));
+                .andExpect(jsonPath("$.code").value("request.rejected"))
+                .andExpect(jsonPath("$.detail").value("Request rejected"));
         verifyNoInteractions(barService);
     }
 
