@@ -201,18 +201,20 @@ class WalletServiceTest {
         when(walletRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         when(transactionRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
-        TokenTransaction movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT, "dia-1",
-                balance -> balance < 5, IllegalStateException::new);
+        Optional<TokenTransaction> movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT,
+                "dia-1", balance -> balance < 5);
 
-        assertEquals(53, movement.getBalanceAfter());
+        assertEquals(53, movement.orElseThrow().getBalanceAfter());
     }
 
     @Test
-    void creditIfRefusesWhenTheBalanceDoesNotAllowIt() {
+    void creditIfGivesNothingWhenTheBalanceDoesNotAllowIt() {
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
 
-        assertThrows(IllegalStateException.class, () -> walletService.creditIf(USER_ID, 50,
-                TransactionType.HOUSE_CREDIT, "dia-1", balance -> balance < 5, IllegalStateException::new));
+        Optional<TokenTransaction> movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT,
+                "dia-1", balance -> balance < 5);
+
+        assertTrue(movement.isEmpty());
         verify(transactionRepository, never()).saveAndFlush(any());
     }
 
@@ -222,10 +224,27 @@ class WalletServiceTest {
         when(walletRepository.saveAndFlush(any()))
                 .thenThrow(new ObjectOptimisticLockingFailureException(Wallet.class, WALLET_ID));
 
-        assertThrows(IllegalStateException.class, () -> walletService.creditIf(USER_ID, 50,
-                TransactionType.HOUSE_CREDIT, "dia-2", balance -> balance < 5, IllegalStateException::new));
+        Optional<TokenTransaction> movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT,
+                "dia-2", balance -> balance < 5);
+
+        assertTrue(movement.isEmpty());
         verify(walletRepository, times(1)).saveAndFlush(any());
         verify(transactionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void creditIfWithAnAlreadyUsedKeyReturnsThatMovementWithoutAskingTheCondition() {
+        TokenTransaction previous = new TokenTransaction(WALLET_ID, 50, TransactionType.HOUSE_CREDIT, 50, "dia-3", NOW);
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+        when(transactionRepository.findByWalletIdAndIdempotencyKey(WALLET_ID, "dia-3")).thenReturn(Optional.of(previous));
+
+        Optional<TokenTransaction> movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT,
+                "dia-3", balance -> {
+                    throw new AssertionError("the condition must not be asked for a repeated key");
+                });
+
+        assertSame(previous, movement.orElseThrow());
+        verify(walletRepository, never()).saveAndFlush(any());
     }
 
     @Test

@@ -15,11 +15,14 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.LongPredicate;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -161,9 +164,9 @@ class BarServiceTest {
         when(walletService.getBalance(USER_ID)).thenReturn(3L);
         when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
         when(walletService.creditIf(eq(USER_ID), eq(BarService.HOUSE_CREDIT), eq(TransactionType.HOUSE_CREDIT),
-                eq(TODAYS_CREDIT), any(), any()))
-                .thenReturn(new TokenTransaction(UUID.randomUUID(), 50, TransactionType.HOUSE_CREDIT, 53,
-                        TODAYS_CREDIT, NIGHT_IN_MADRID));
+                eq(TODAYS_CREDIT), any()))
+                .thenReturn(Optional.of(new TokenTransaction(UUID.randomUUID(), 50, TransactionType.HOUSE_CREDIT, 53,
+                        TODAYS_CREDIT, NIGHT_IN_MADRID)));
         when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(97L);
 
         HouseCreditResponse credit = barService.houseCredit(USER_ID);
@@ -175,11 +178,24 @@ class BarServiceTest {
     }
 
     @Test
+    void theHouseCreditOnlyGoesThroughWhileTheMemberCannotPayTheCheapestDrink() {
+        ArgumentCaptor<LongPredicate> condition = ArgumentCaptor.forClass(LongPredicate.class);
+        when(walletService.getBalance(USER_ID)).thenReturn(0L);
+        when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
+        when(walletService.creditIf(eq(USER_ID), eq(BarService.HOUSE_CREDIT), eq(TransactionType.HOUSE_CREDIT),
+                eq(TODAYS_CREDIT), condition.capture())).thenReturn(Optional.empty());
+
+        assertThrows(HouseCreditNotNeededException.class, () -> barService.houseCredit(USER_ID));
+        assertTrue(condition.getValue().test(4));
+        assertFalse(condition.getValue().test(5));
+    }
+
+    @Test
     void theHouseDoesNotLendToWhoeverCanStillPay() {
         when(walletService.getBalance(USER_ID)).thenReturn(5L);
 
         assertThrows(HouseCreditNotNeededException.class, () -> barService.houseCredit(USER_ID));
-        verify(walletService, never()).creditIf(any(), anyLong(), any(), any(), any(), any());
+        verify(walletService, never()).creditIf(any(), anyLong(), any(), any(), any());
     }
 
     @Test
@@ -188,7 +204,7 @@ class BarServiceTest {
         when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(true);
 
         assertThrows(HouseCreditUsedTodayException.class, () -> barService.houseCredit(USER_ID));
-        verify(walletService, never()).creditIf(any(), anyLong(), any(), any(), any(), any());
+        verify(walletService, never()).creditIf(any(), anyLong(), any(), any(), any());
     }
 
     @Test

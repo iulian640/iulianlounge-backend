@@ -29,8 +29,6 @@ public class WalletService {
 
     public static final long WELCOME_BONUS = 100;
 
-    private static final LongPredicate ANY_BALANCE = balance -> true;
-
     private final WalletRepository walletRepository;
     private final TokenTransactionRepository transactionRepository;
     private final TransactionOperations transactions;
@@ -52,20 +50,33 @@ public class WalletService {
     }
 
     public TokenTransaction credit(UUID userId, long amount, TransactionType type, String idempotencyKey) {
-        return creditIf(userId, amount, type, idempotencyKey, ANY_BALANCE, null);
-    }
-
-    public TokenTransaction creditIf(UUID userId, long amount, TransactionType type, String idempotencyKey,
-            LongPredicate allowedBalance, Supplier<? extends RuntimeException> refusal) {
         requireOwnTransaction();
         requirePositive(amount);
-        return withOneRetry(() -> applyTo(userId, amount, type, idempotencyKey, allowedBalance, refusal));
+        return withOneRetry(() -> applyTo(userId, amount, type, idempotencyKey));
+    }
+
+    public Optional<TokenTransaction> creditIf(UUID userId, long amount, TransactionType type, String idempotencyKey,
+            LongPredicate allowedBalance) {
+        requireOwnTransaction();
+        requirePositive(amount);
+        Objects.requireNonNull(allowedBalance, "allowedBalance");
+        return withOneRetry(() -> {
+            Wallet wallet = findWallet(userId);
+            Optional<TokenTransaction> previous = previousMovement(wallet, amount, type, idempotencyKey);
+            if (previous.isPresent()) {
+                return previous;
+            }
+            if (!allowedBalance.test(wallet.getBalance())) {
+                return Optional.empty();
+            }
+            return Optional.of(apply(wallet, amount, type, idempotencyKey));
+        });
     }
 
     public TokenTransaction debit(UUID userId, long amount, TransactionType type, String idempotencyKey) {
         requireOwnTransaction();
         requirePositive(amount);
-        return withOneRetry(() -> applyTo(userId, -amount, type, idempotencyKey, ANY_BALANCE, null));
+        return withOneRetry(() -> applyTo(userId, -amount, type, idempotencyKey));
     }
 
     public long getBalance(UUID userId) {
@@ -89,24 +100,24 @@ public class WalletService {
         return transactionRepository.findByWalletIdOrderByCreatedAtDescIdDesc(findWallet(userId).getId(), pageable);
     }
 
-    private TokenTransaction applyTo(UUID userId, long signedAmount, TransactionType type, String idempotencyKey,
-            LongPredicate allowedBalance, Supplier<? extends RuntimeException> refusal) {
+    private TokenTransaction applyTo(UUID userId, long signedAmount, TransactionType type, String idempotencyKey) {
         Wallet wallet = findWallet(userId);
+        return previousMovement(wallet, signedAmount, type, idempotencyKey)
+                .orElseGet(() -> apply(wallet, signedAmount, type, idempotencyKey));
+    }
 
-        if (idempotencyKey != null) {
-            Optional<TokenTransaction> previous =
-                    transactionRepository.findByWalletIdAndIdempotencyKey(wallet.getId(), idempotencyKey);
-            if (previous.isPresent()) {
-                if (previous.get().getAmount() != signedAmount || previous.get().getType() != type) {
-                    throw new IdempotencyMismatchException();
-                }
-                return previous.get();
-            }
+    private Optional<TokenTransaction> previousMovement(Wallet wallet, long signedAmount, TransactionType type,
+            String idempotencyKey) {
+        if (idempotencyKey == null) {
+            return Optional.empty();
         }
-        if (!allowedBalance.test(wallet.getBalance())) {
-            throw refusal.get();
+        Optional<TokenTransaction> previous =
+                transactionRepository.findByWalletIdAndIdempotencyKey(wallet.getId(), idempotencyKey);
+        if (previous.isPresent()
+                && (previous.get().getAmount() != signedAmount || previous.get().getType() != type)) {
+            throw new IdempotencyMismatchException();
         }
-        return apply(wallet, signedAmount, type, idempotencyKey);
+        return previous;
     }
 
     private TokenTransaction apply(Wallet wallet, long signedAmount, TransactionType type, String idempotencyKey) {
@@ -122,7 +133,7 @@ public class WalletService {
                 wallet.getId(), signedAmount, type, newBalance, idempotencyKey, clock.instant()));
     }
 
-    private TokenTransaction withOneRetry(Supplier<TokenTransaction> movement) {
+    private <T> T withOneRetry(Supplier<T> movement) {
         try {
             return transactions.execute(status -> movement.get());
         } catch (OptimisticLockingFailureException firstClash) {

@@ -256,7 +256,7 @@ classDiagram
     class WalletService {
         +openWallet(UUID) TokenTransaction
         +credit(UUID, long, TransactionType, String) TokenTransaction
-        +creditIf(UUID, long, TransactionType, String, LongPredicate, Supplier) TokenTransaction
+        +creditIf(UUID, long, TransactionType, String, LongPredicate) Optional~TokenTransaction~
         +debit(UUID, long, TransactionType, String) TokenTransaction
         +getBalance(UUID) long
         +spentOn(UUID, TransactionType) long
@@ -305,7 +305,7 @@ classDiagram
     WalletService --> TokenTransactionRepository
 ```
 
-- El saldo solo se toca a través de `WalletService`. `RegisterService` (bono de bienvenida) y `BarService` (pedidos y crédito de la casa) pasan por él. Ninguno de los dos toca los repositorios de cartera. `creditIf` comprueba una condición sobre el saldo dentro de la transacción del crédito, y la vuelve a comprobar si reintenta: así el fiado no se cuela si el saldo cambió entre la consulta y el cobro.
+- El saldo solo se toca a través de `WalletService`. `RegisterService` (bono de bienvenida) y `BarService` (pedidos y crédito de la casa) pasan por él. Ninguno de los dos toca los repositorios de cartera. `creditIf` comprueba una condición sobre el saldo dentro de la transacción del crédito, y la vuelve a comprobar si reintenta: así el fiado no se cuela si el saldo cambió entre la consulta y el cobro. Devuelve un `Optional` vacío si la condición no se cumple, y `BarService` lo convierte en 422 con `orElseThrow`.
 - `UserService` usa `BarService` solo para sacar el rango que devuelve `GET /api/v1/me`.
 - `UserRepository` y `WalletRepository` extienden `JpaRepository`, y de ahí salen `findById` y `saveAndFlush`. `TokenTransactionRepository` extiende `Repository` a secas, así que no expone `delete` ni el `save` genérico.
 - `AuthService` devuelve el record `IssuedTokens`. `AuthController` monta y borra la cookie `refresh_token` con los métodos estáticos de `RefreshCookies` (ADR-08).
