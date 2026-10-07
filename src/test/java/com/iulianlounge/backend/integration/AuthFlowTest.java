@@ -22,7 +22,10 @@ import com.jayway.jsonpath.JsonPath;
 
 import jakarta.servlet.http.Cookie;
 
-@SpringBootTest(properties = "jwt.secret=dGVzdC1zZWNyZXQtcXVlLXRpZW5lLW1hcy1kZS0zMi1ieXRlcyEh")
+@SpringBootTest(properties = {
+        "jwt.secret=dGVzdC1zZWNyZXQtcXVlLXRpZW5lLW1hcy1kZS0zMi1ieXRlcyEh",
+        "auth.rate-limit.max-per-minute=1000"
+})
 @AutoConfigureMockMvc
 @Transactional
 class AuthFlowTest {

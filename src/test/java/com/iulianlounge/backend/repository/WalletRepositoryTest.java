@@ -2,6 +2,7 @@ package com.iulianlounge.backend.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -10,6 +11,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -136,13 +138,18 @@ class WalletRepositoryTest {
 
     @Test
     void databaseRejectsAnUnknownMovementType() {
-        assertThrows(PersistenceException.class, () -> insertMovement("PROPINA", 10));
+        assertViolates("token_transaction_type_check", () -> insertMovement("PROPINA", 10));
     }
 
     @ParameterizedTest
     @CsvSource({"BAR_ORDER, 10", "WELCOME_BONUS, -10", "HOUSE_CREDIT, -10"})
     void databaseRejectsAMovementWhoseSignDoesNotMatchItsType(String type, long amount) {
-        assertThrows(PersistenceException.class, () -> insertMovement(type, amount));
+        assertViolates("token_transaction_amount_sign_check", () -> insertMovement(type, amount));
+    }
+
+    @Test
+    void theNativeInsertUsedByTheseChecksWorksForAValidMovement() {
+        insertMovement("BAR_ORDER", -10);
     }
 
     @Test
@@ -165,6 +172,15 @@ class WalletRepositoryTest {
         long sum = transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), TransactionType.BAR_ORDER);
 
         assertEquals(0, sum);
+    }
+
+    private static void assertViolates(String constraint, Executable insert) {
+        PersistenceException error = assertThrows(PersistenceException.class, insert);
+        Throwable cause = error;
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        assertTrue(cause.getMessage().contains(constraint), cause.getMessage());
     }
 
     private void insertMovement(String type, long amount) {
