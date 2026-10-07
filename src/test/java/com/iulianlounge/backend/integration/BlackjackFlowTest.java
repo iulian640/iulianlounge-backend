@@ -1,6 +1,7 @@
 package com.iulianlounge.backend.integration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,7 +11,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.iulianlounge.backend.domain.Bet;
@@ -38,6 +46,8 @@ import com.jayway.jsonpath.JsonPath;
 })
 @AutoConfigureMockMvc
 class BlackjackFlowTest {
+
+    private static final int ROUNDS = 5;
 
     @Autowired
     private MockMvc mockMvc;
@@ -280,6 +290,144 @@ class BlackjackFlowTest {
                 "SELECT count(*) FROM blackjack_hand WHERE id = ? AND settled_at IS NOT NULL", Integer.class,
                 unpaid.getId());
         assertEquals(1, settled);
+    }
+
+    @Test
+    void twoSimultaneousStandsOnTheSameHandPayItExactlyOnce() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            String bearer = registerAndLogIn();
+            UUID userId = userIdOf(bearer);
+            stack("TS", "6D", "9H", "5C", "4D", "3H");
+            String handId = JsonPath.read(dealBody(bearer, "TWENTY"), "$.hand.id");
+
+            List<MvcResult> results = race(
+                    () -> action(bearer, handId, "stand").andReturn(),
+                    () -> action(bearer, handId, "stand").andReturn());
+
+            assertEachAnsweredOkOrFinished(results);
+            assertEquals(1, movements(userId, TransactionType.BLACKJACK_BET));
+            assertEquals(1, movements(userId, TransactionType.BLACKJACK_PAYOUT));
+            assertEquals(1, handsOf(userId));
+            assertEquals(1, settledHandsOf(userId));
+            table(bearer).andExpect(jsonPath("$.balance").value(120));
+        }
+    }
+
+    @Test
+    void aHitAndAStandAtTheSameTimeLeaveACoherentHandAndAtMostOnePayout() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            String bearer = registerAndLogIn();
+            UUID userId = userIdOf(bearer);
+            stack("TS", "6D", "9H", "5C", "2C", "4D", "3H");
+            String handId = JsonPath.read(dealBody(bearer, "TWENTY"), "$.hand.id");
+
+            List<MvcResult> results = race(
+                    () -> action(bearer, handId, "hit").andReturn(),
+                    () -> action(bearer, handId, "stand").andReturn());
+
+            assertEachAnsweredOkOrFinished(results);
+            String status = jdbcTemplate.queryForObject(
+                    "SELECT status FROM blackjack_hand WHERE user_id = ?", String.class, userId);
+            assertEquals(1, movements(userId, TransactionType.BLACKJACK_BET));
+            if ("FINISHED".equals(status)) {
+                assertEquals(1, movements(userId, TransactionType.BLACKJACK_PAYOUT));
+                assertEquals(1, settledHandsOf(userId));
+                table(bearer).andExpect(jsonPath("$.balance").value(120));
+            } else {
+                assertEquals("PLAYER_TURN", status);
+                assertEquals(0, movements(userId, TransactionType.BLACKJACK_PAYOUT));
+                table(bearer).andExpect(jsonPath("$.balance").value(80));
+            }
+        }
+    }
+
+    @Test
+    void twoSimultaneousDealsWithTheSameKeyChargeOnceAndSeatOneHand() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            String bearer = registerAndLogIn();
+            UUID userId = userIdOf(bearer);
+            UUID key = UUID.randomUUID();
+            stack("9S", "KD", "8H", "5C");
+
+            List<MvcResult> results = race(
+                    () -> deal(bearer, key, "TWENTY").andReturn(),
+                    () -> deal(bearer, key, "TWENTY").andReturn());
+
+            String handId = null;
+            int answered = 0;
+            for (MvcResult result : results) {
+                int status = result.getResponse().getStatus();
+                assertTrue(status == 200 || status == 409, "status " + status);
+                if (status == 200) {
+                    answered++;
+                    String id = JsonPath.read(result.getResponse().getContentAsString(), "$.hand.id");
+                    assertEquals(handId == null ? id : handId, id);
+                    handId = id;
+                }
+            }
+            assertTrue(answered >= 1);
+            assertEquals(1, movements(userId, TransactionType.BLACKJACK_BET));
+            assertEquals(1, handsOf(userId));
+            table(bearer)
+                    .andExpect(jsonPath("$.hand.id").value(handId))
+                    .andExpect(jsonPath("$.balance").value(80));
+        }
+    }
+
+    private List<MvcResult> race(Callable<MvcResult> first, Callable<MvcResult> second) throws Exception {
+        CyclicBarrier start = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<MvcResult> a = pool.submit(() -> {
+                start.await();
+                return first.call();
+            });
+            Future<MvcResult> b = pool.submit(() -> {
+                start.await();
+                return second.call();
+            });
+            return List.of(a.get(), b.get());
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private void assertEachAnsweredOkOrFinished(List<MvcResult> results) throws Exception {
+        int answered = 0;
+        for (MvcResult result : results) {
+            int status = result.getResponse().getStatus();
+            assertTrue(status == 200 || status == 409, "status " + status);
+            if (status == 200) {
+                answered++;
+            } else {
+                assertEquals("blackjack.hand_finished",
+                        JsonPath.read(result.getResponse().getContentAsString(), "$.code"));
+            }
+        }
+        assertTrue(answered >= 1);
+    }
+
+    private String dealBody(String bearer, String bet) throws Exception {
+        return deal(bearer, UUID.randomUUID(), bet).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private int movements(UUID userId, TransactionType type) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM token_transaction t JOIN wallet w ON w.id = t.wallet_id "
+                        + "WHERE w.user_id = ? AND t.type = ?",
+                Integer.class, userId, type.name());
+    }
+
+    private int handsOf(UUID userId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM blackjack_hand WHERE user_id = ?", Integer.class, userId);
+    }
+
+    private int settledHandsOf(UUID userId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM blackjack_hand WHERE user_id = ? AND settled_at IS NOT NULL",
+                Integer.class, userId);
     }
 
     private void stack(String... codes) {
