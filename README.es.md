@@ -116,11 +116,15 @@ sequenceDiagram
 
 ### Modelo de datos
 
-Hoy solo existe `users` (migraciones V1 a V3). La cartera y el ledger llegan en
-la V4.
+Tres tablas tras las migraciones V1 a V6. Todas las restricciones e índices, los
+diagramas de clases del dominio y por capas y la secuencia de pedir una copa están en
+[docs/diagramas.md](docs/diagramas.md).
 
 ```mermaid
 erDiagram
+    users ||--o| wallet : "wallet.user_id"
+    wallet ||--o{ token_transaction : "token_transaction.wallet_id"
+
     users {
         uuid id PK
         varchar username UK "50, [A-Za-z0-9_.-]"
@@ -130,6 +134,24 @@ erDiagram
         text locale "CHECK: es, en"
         timestamptz created_at
         timestamptz last_seen_at
+    }
+
+    wallet {
+        uuid id PK
+        uuid user_id FK,UK "ON DELETE CASCADE"
+        bigint balance "CHECK >= 0"
+        bigint version "bloqueo optimista"
+        timestamptz created_at
+    }
+
+    token_transaction {
+        uuid id PK
+        uuid wallet_id FK "ON DELETE RESTRICT"
+        bigint amount "con signo, BAR_ORDER siempre < 0"
+        text type "WELCOME_BONUS, BAR_ORDER, HOUSE_CREDIT"
+        bigint balance_after "CHECK >= 0"
+        text idempotency_key "única por cartera, máx. 64"
+        timestamptz created_at
     }
 ```
 
