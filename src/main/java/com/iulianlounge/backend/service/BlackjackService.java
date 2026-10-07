@@ -1,0 +1,206 @@
+package com.iulianlounge.backend.service;
+
+import java.time.Clock;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.UnaryOperator;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.stereotype.Service;
+
+import com.iulianlounge.backend.domain.Bet;
+import com.iulianlounge.backend.domain.BlackjackHand;
+import com.iulianlounge.backend.domain.BlackjackRules;
+import com.iulianlounge.backend.domain.BlackjackTable;
+import com.iulianlounge.backend.domain.Card;
+import com.iulianlounge.backend.domain.HandStatus;
+import com.iulianlounge.backend.domain.Shuffler;
+import com.iulianlounge.backend.domain.TokenTransaction;
+import com.iulianlounge.backend.domain.TransactionType;
+import com.iulianlounge.backend.dto.BetOption;
+import com.iulianlounge.backend.dto.BlackjackResponse;
+import com.iulianlounge.backend.dto.HandResponse;
+import com.iulianlounge.backend.dto.HandView;
+import com.iulianlounge.backend.exception.HandFinishedException;
+import com.iulianlounge.backend.exception.HandInProgressException;
+import com.iulianlounge.backend.exception.HandNotFoundException;
+import com.iulianlounge.backend.exception.IdempotencyMismatchException;
+import com.iulianlounge.backend.repository.BlackjackHandRepository;
+
+@Service
+public class BlackjackService {
+
+    static final String BET_KEY_PREFIX = "blackjack-bet:";
+    static final String PAYOUT_KEY_PREFIX = "blackjack-payout:";
+    private static final String TABLE_CONSTRAINT = "blackjack_hand_one_in_progress";
+    private static final String KEY_CONSTRAINT = "blackjack_hand_user_idempotency_key";
+
+    private final WalletService walletService;
+    private final BlackjackHandRepository handRepository;
+    private final Shuffler shuffler;
+    private final Clock clock;
+
+    public BlackjackService(WalletService walletService, BlackjackHandRepository handRepository, Shuffler shuffler,
+            Clock clock) {
+        this.walletService = walletService;
+        this.handRepository = handRepository;
+        this.shuffler = shuffler;
+        this.clock = clock;
+    }
+
+    public BlackjackResponse table(UUID userId) {
+        reconcile(userId);
+        HandView hand = handRepository.findByUserIdAndStatus(userId, HandStatus.PLAYER_TURN)
+                .map(HandView::of)
+                .orElse(null);
+        return new BlackjackResponse(hand, walletService.getBalance(userId), BetOption.all());
+    }
+
+    public HandResponse deal(UUID userId, Bet bet, UUID idempotencyKey) {
+        reconcile(userId);
+        Optional<BlackjackHand> replay = handRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
+        if (replay.isPresent()) {
+            return answerReplay(userId, bet, replay.get());
+        }
+        if (handRepository.findByUserIdAndStatus(userId, HandStatus.PLAYER_TURN).isPresent()) {
+            throw new HandInProgressException();
+        }
+        walletService.debit(userId, bet.chips(), TransactionType.BLACKJACK_BET, BET_KEY_PREFIX + idempotencyKey);
+        BlackjackHand hand = seatDealtHand(userId, idempotencyKey, bet)
+                .filter(seated -> seated.getStatus() != HandStatus.VOID)
+                .orElseThrow(HandInProgressException::new);
+        return respond(userId, settleIfFinished(hand));
+    }
+
+    public HandResponse hit(UUID userId, UUID handId) {
+        return play(userId, handId, BlackjackRules::hit);
+    }
+
+    public HandResponse stand(UUID userId, UUID handId) {
+        return play(userId, handId, BlackjackRules::stand);
+    }
+
+    private void reconcile(UUID userId) {
+        if (walletService.spentOn(userId, TransactionType.BLACKJACK_BET) != handRepository.sumBetByUserId(userId)) {
+            adoptOrphanBets(userId);
+        }
+        handRepository.findUnsettledByUserId(userId).forEach(this::settle);
+    }
+
+    private void adoptOrphanBets(UUID userId) {
+        for (TokenTransaction movement : walletService.movementsOf(userId, TransactionType.BLACKJACK_BET)) {
+            keyOf(movement)
+                    .filter(key -> handRepository.findByUserIdAndIdempotencyKey(userId, key).isEmpty())
+                    .ifPresent(key -> seatDealtHand(userId, key, Bet.fromChips(-movement.getAmount())));
+        }
+    }
+
+    private static Optional<UUID> keyOf(TokenTransaction bet) {
+        String ledgerKey = bet.getIdempotencyKey();
+        if (ledgerKey == null || !ledgerKey.startsWith(BET_KEY_PREFIX)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(UUID.fromString(ledgerKey.substring(BET_KEY_PREFIX.length())));
+        } catch (IllegalArgumentException notAKey) {
+            return Optional.empty();
+        }
+    }
+
+    private HandResponse answerReplay(UUID userId, Bet bet, BlackjackHand existing) {
+        if (existing.getBet() != bet) {
+            throw new IdempotencyMismatchException();
+        }
+        if (existing.getStatus() == HandStatus.VOID) {
+            throw new HandInProgressException();
+        }
+        return respond(userId, existing);
+    }
+
+    private HandResponse play(UUID userId, UUID handId, UnaryOperator<BlackjackTable> move) {
+        reconcile(userId);
+        BlackjackHand hand = find(userId, handId);
+        if (hand.getStatus() != HandStatus.PLAYER_TURN) {
+            throw new HandFinishedException();
+        }
+        hand.play(move.apply(hand.table()), clock.instant());
+        BlackjackHand saved;
+        try {
+            saved = handRepository.saveAndFlush(hand);
+        } catch (OptimisticLockingFailureException clash) {
+            return respond(userId, find(userId, handId));
+        }
+        return respond(userId, settleIfFinished(saved));
+    }
+
+    private Optional<BlackjackHand> seatDealtHand(UUID userId, UUID idempotencyKey, Bet bet) {
+        BlackjackTable table = BlackjackRules.deal(shuffler.shuffle(Card.deck()));
+        try {
+            return Optional.of(handRepository.saveAndFlush(
+                    new BlackjackHand(userId, idempotencyKey, bet, table, clock.instant())));
+        } catch (DataIntegrityViolationException clash) {
+            boolean tableTaken = violates(clash, TABLE_CONSTRAINT);
+            if (!tableTaken && !violates(clash, KEY_CONSTRAINT)) {
+                throw clash;
+            }
+            Optional<BlackjackHand> winner = handRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey);
+            if (winner.isPresent()) {
+                return winner;
+            }
+            if (!tableTaken) {
+                throw clash;
+            }
+            return voidTheBet(userId, idempotencyKey, bet);
+        }
+    }
+
+    private Optional<BlackjackHand> voidTheBet(UUID userId, UUID idempotencyKey, Bet bet) {
+        BlackjackHand voided;
+        try {
+            voided = handRepository.saveAndFlush(BlackjackHand.voided(userId, idempotencyKey, bet, clock.instant()));
+        } catch (DataIntegrityViolationException clash) {
+            return Optional.of(handRepository.findByUserIdAndIdempotencyKey(userId, idempotencyKey)
+                    .orElseThrow(() -> clash));
+        }
+        settle(voided);
+        return Optional.empty();
+    }
+
+    private static boolean violates(Throwable error, String constraint) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.contains(constraint)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private BlackjackHand settleIfFinished(BlackjackHand hand) {
+        return hand.getStatus() == HandStatus.FINISHED ? settle(hand) : hand;
+    }
+
+    private BlackjackHand settle(BlackjackHand hand) {
+        if (hand.getPayout() > 0) {
+            walletService.credit(hand.getUserId(), hand.getPayout(), TransactionType.BLACKJACK_PAYOUT,
+                    PAYOUT_KEY_PREFIX + hand.getId());
+        }
+        hand.settle(clock.instant());
+        try {
+            return handRepository.saveAndFlush(hand);
+        } catch (OptimisticLockingFailureException clash) {
+            return handRepository.findByIdAndUserId(hand.getId(), hand.getUserId()).orElse(hand);
+        }
+    }
+
+    private BlackjackHand find(UUID userId, UUID handId) {
+        return handRepository.findByIdAndUserId(handId, userId)
+                .filter(hand -> hand.getStatus() != HandStatus.VOID)
+                .orElseThrow(HandNotFoundException::new);
+    }
+
+    private HandResponse respond(UUID userId, BlackjackHand hand) {
+        return new HandResponse(HandView.of(hand), walletService.getBalance(userId));
+    }
+}

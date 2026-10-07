@@ -25,6 +25,12 @@ public enum ErrorCode {
     BAR_CREDIT_USED_TODAY("bar.credit_used_today", HttpStatus.CONFLICT, "House credit already given today"),
     BAR_TOO_MANY_REQUESTS("bar.too_many_requests", HttpStatus.TOO_MANY_REQUESTS, "Too many bar requests, try again later"),
 
+    BLACKJACK_HAND_IN_PROGRESS("blackjack.hand_in_progress", HttpStatus.CONFLICT, "A hand is already in progress"),
+    BLACKJACK_HAND_NOT_FOUND("blackjack.hand_not_found", HttpStatus.NOT_FOUND, "Hand not found"),
+    BLACKJACK_HAND_FINISHED("blackjack.hand_finished", HttpStatus.CONFLICT, "The hand is already finished"),
+    BLACKJACK_TOO_MANY_REQUESTS("blackjack.too_many_requests", HttpStatus.TOO_MANY_REQUESTS,
+            "Too many blackjack requests, try again later"),
+
     DATA_CONFLICT("data.conflict", HttpStatus.CONFLICT, "Data conflict"),
 
     VALIDATION_FAILED("validation.failed", HttpStatus.BAD_REQUEST, "Request validation failed"),

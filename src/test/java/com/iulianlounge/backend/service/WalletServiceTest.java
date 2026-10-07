@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -329,6 +330,27 @@ class WalletServiceTest {
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
 
         assertFalse(walletService.hasMovement(USER_ID, "house-credit:2026-10-07"));
+    }
+
+    @Test
+    void movementsOfReturnsTheWalletsMovementsOfThatType() {
+        TokenTransaction first = new TokenTransaction(WALLET_ID, -10, TransactionType.BLACKJACK_BET, 90,
+                "blackjack-bet:a", NOW);
+        TokenTransaction second = new TokenTransaction(WALLET_ID, -20, TransactionType.BLACKJACK_BET, 70,
+                "blackjack-bet:b", NOW);
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(70)));
+        when(transactionRepository.findByWalletIdAndTypeOrderByCreatedAtAscIdAsc(WALLET_ID,
+                TransactionType.BLACKJACK_BET)).thenReturn(List.of(first, second));
+
+        assertEquals(List.of(first, second), walletService.movementsOf(USER_ID, TransactionType.BLACKJACK_BET));
+    }
+
+    @Test
+    void movementsOfIsEmptyForAUserWithoutWallet() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+        assertEquals(List.of(), walletService.movementsOf(USER_ID, TransactionType.BLACKJACK_BET));
+        verify(transactionRepository, never()).findByWalletIdAndTypeOrderByCreatedAtAscIdAsc(any(), any());
     }
 
     private static Wallet walletWith(long balance) {

@@ -9,7 +9,27 @@
 
 **Cross-cutting decision before everything else**: tokens are represented as integers (`BIGINT` / `long`), never decimals or `double`. Every balance mutation goes through a single service (`WalletService`) and is recorded in an append-only ledger. Everything else in the system (blackjack, katas, shop, incremental, loans) are *clients* of that service.
 
-**Implementation status (2026-09-25, sprint 8 closed):** done: the skeleton (Spring Boot 4.1, PostgreSQL 17 in Docker, CI with an 80 % JaCoCo gate) and the whole of authentication: register, login, refresh with an `HttpOnly` cookie, logout, JWT filter and `GET /me` (IUL-18 to IUL-21, ADR-08). Errors carry a stable `code` from the `ErrorCode` enum (ADR-06). Migrations V1 (`users`), V2 (case-insensitive unique email) and V3 (`CHECK` on `role` and `locale`). Next: wallet and ledger (V4, sprint 9). Blackjack, challenges, shop, incremental and social are out of the MVP (epic IUL-54): their sections stay as design, not as plan. Git flow: feature branches from `dev`, and `main` is brought level with `dev` when each ticket closes.
+**Implementation status (2026-10-07, sprint 10):**
+
+- Skeleton: Spring Boot 4.1, PostgreSQL 17 in Docker, CI with an 80 % JaCoCo gate.
+- Full authentication (ADR-08): register, login, refresh with an `HttpOnly` cookie, logout, JWT filter, `GET /me` and a rate limit on login and register.
+- Errors carry a stable `code` from the `ErrorCode` enum (ADR-06).
+- Wallet with an append-only ledger and a welcome bonus (ADR-04).
+- **The Bar (ADR-10):** fixed menu, idempotent orders charged to the wallet, a rank derived from spending and a daily house credit.
+- **Blackjack (ADR-11):** one hand against the dealer, bets of 10, 20 or 50 chips. The server shuffles with `SecureRandom` and keeps the deck and the hole card. The bet and the payout go to the ledger under idempotent keys, and every call reconciles whatever was left half done. Endpoints: `GET /blackjack`, `POST /blackjack/hands`, `POST /blackjack/hands/{id}/hit` and `POST /blackjack/hands/{id}/stand`.
+- Migrations:
+
+  | Migration | What it does |
+  |---|---|
+  | V1 | `users` |
+  | V2 | case-insensitive unique email |
+  | V3 | `CHECK` on `role` and `locale` |
+  | V4 | `wallet` and `token_transaction` |
+  | V5 | bar movement types |
+  | V6 | spending index and amount sign tied to the type |
+  | V7 | `blackjack_hand` and the `BLACKJACK_BET` and `BLACKJACK_PAYOUT` types |
+
+- Out of the MVP (epic IUL-54): challenges, shop, incremental, social and the bartender's tab. Their sections stay as design, not as plan. Branch flow: feature branches from `dev`, and `main` is brought level with `dev` when each ticket closes.
 
 ---
 
@@ -483,7 +503,7 @@ Expanded as of 2026-07-14: [ADR-04](adr/ADR-04-ledger-append-only-saldo-material
 
 **ADR-02 — Kata anti-cheat: rotated hidden cases with server-side output verification (accepted).** The client runs the kata in a Web Worker against hidden cases the server hands out *without* the expected outputs; the client returns its outputs and the server compares them against the expected ones only it knows. Rotating case groups + rate limit (5 submissions/min) + single payment per challenge make brute-forcing outputs more expensive than solving the kata. Rejected alternatives: running JS on the server (GraalVM/sandbox: a huge attack surface for a junior), cryptographic signing of outputs on the client (the key would live in the client: security theater). It is explicitly accepted that a dedicated cheater can solve a case by hand: the bar is "cheating costs more effort than solving".
 
-**ADR-03 — Blackjack with full server authority (accepted).** The server shuffles (SecureRandom), stores the deck in `stateJson` and exposes only the visible state; the client is a remote control sending HIT/STAND. Implications: every action is a round-trip (acceptable turn-based), session state must survive reconnections (GET of the open session), and bets are settled in the same DB transaction as the state change. Rejected alternative: client-side logic with later validation — impossible to secure and pedagogically worse.
+**ADR-03 — Blackjack with full server authority (accepted, partly replaced by ADR-11).** Since rule 6 of ADR-04, `WalletService` opens its own transaction for every movement and refuses to run inside another one, so the bet is no longer settled in the same transaction as the hand state. ADR-11 replaces that with idempotent keys and a reconciliation on every call; the rest (server authority, `SecureRandom`, state that survives a reload) stays. Original text: The server shuffles (SecureRandom), stores the deck in `stateJson` and exposes only the visible state; the client is a remote control sending HIT/STAND. Implications: every action is a round-trip (acceptable turn-based), session state must survive reconnections (GET of the open session), and bets are settled in the same DB transaction as the state change. Rejected alternative: client-side logic with later validation — impossible to secure and pedagogically worse.
 
 **ADR-04 — Append-only ledger + materialized balance with optimistic locking (accepted).** `TokenTransaction` is the auditable truth; `Wallet.balance` is the materialized view updated in the same transaction, protected with `@Version` and retry (1 retry, then 409). Fully derived balance (SUM over the ledger) rejected: every bet would scan the history. Pessimistic locking (`SELECT FOR UPDATE`) rejected as the default: with one user per wallet the real contention is their own double click, which the idempotencyKey solves; optimistic teaches more and scales better.
 

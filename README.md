@@ -52,6 +52,10 @@ Base path: `/api/v1`. Responses are plain JSON, no envelope.
 | POST | `/auth/refresh` | No body: reads the cookie → `{accessToken, expiresIn}` and a new cookie |
 | POST | `/auth/logout` | Clears the cookie → 204 |
 | GET | `/me` | With `Authorization: Bearer` → `{userId, username, locale, rank}` |
+| GET | `/blackjack` | The hand in progress (or `null`), the balance and the bet options `[{code, chips}]` |
+| POST | `/blackjack/hands` | `Idempotency-Key` header and `{bet}` (`TEN`, `TWENTY` or `FIFTY`) → `{hand, balance}`. A natural comes back already paid |
+| POST | `/blackjack/hands/{id}/hit` | Draws a card for the player → `{hand, balance}` |
+| POST | `/blackjack/hands/{id}/stand` | The dealer plays and the hand is settled → `{hand, balance}` |
 
 The access token lasts 15 minutes and the frontend keeps it in memory. The
 refresh token lasts at most 7 days from login and travels in a cookie that
@@ -117,14 +121,15 @@ sequenceDiagram
 
 ### Data model
 
-Three tables after migrations V1 to V6. Every constraint and index, the domain
-and layer class diagrams and the drink-ordering sequence are in
+Four tables after migrations V1 to V7. Every constraint and index, the domain
+and layer class diagrams and the drink-ordering and blackjack-deal sequences are in
 [docs/diagramas.md](docs/diagramas.md) (Spanish).
 
 ```mermaid
 erDiagram
     users ||--o| wallet : "wallet.user_id"
     wallet ||--o{ token_transaction : "token_transaction.wallet_id"
+    users ||--o{ blackjack_hand : "blackjack_hand.user_id"
 
     users {
         uuid id PK
@@ -148,11 +153,28 @@ erDiagram
     token_transaction {
         uuid id PK
         uuid wallet_id FK "ON DELETE RESTRICT"
-        bigint amount "signed, BAR_ORDER always < 0"
-        text type "WELCOME_BONUS, BAR_ORDER, HOUSE_CREDIT"
+        bigint amount "signed, BAR_ORDER and BLACKJACK_BET always < 0"
+        text type "WELCOME_BONUS, BAR_ORDER, HOUSE_CREDIT, BLACKJACK_BET, BLACKJACK_PAYOUT"
         bigint balance_after "CHECK >= 0"
         text idempotency_key "unique per wallet, max 64"
         timestamptz created_at
+    }
+
+    blackjack_hand {
+        uuid id PK
+        uuid user_id FK "ON DELETE CASCADE, one PLAYER_TURN per member"
+        uuid idempotency_key "unique per member"
+        bigint bet "CHECK: 10, 20, 50"
+        text status "PLAYER_TURN, FINISHED, VOID"
+        text outcome "BLACKJACK, WIN, PUSH, LOSE"
+        bigint payout "tied to the outcome"
+        text deck "server only"
+        text player_cards
+        text dealer_cards "server only until the hand ends"
+        bigint version "optimistic lock"
+        timestamptz created_at
+        timestamptz finished_at
+        timestamptz settled_at
     }
 ```
 
