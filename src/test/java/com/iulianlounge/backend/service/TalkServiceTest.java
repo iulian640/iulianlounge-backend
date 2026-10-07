@@ -42,6 +42,7 @@ import com.iulianlounge.backend.repository.UserRepository;
 class TalkServiceTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
+    private static final String IP = "203.0.113.7";
     private static final String HELLO = "¿Qué me pongo si vengo de un día largo?";
 
     @Mock
@@ -59,17 +60,17 @@ class TalkServiceTest {
     void setUp() {
         llm = new FakeLlmClient();
         memory = new TalkMemory(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")));
-        budget = new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 500_000, 8);
+        budget = new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 500_000, 8, 30, 60);
         talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(), budget, memory);
     }
 
     @Test
     void whenTheDailyBudgetIsSpentTheBarmanIsBusyWithoutCallingTheModel(CapturedOutput output) {
         talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
-                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 0, 8), memory);
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 0, 8, 30, 60), memory);
         member(Language.ES);
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertBusy(response);
         assertTrue(llm.calls().isEmpty());
@@ -77,11 +78,53 @@ class TalkServiceTest {
     }
 
     @Test
+    void pastTheDailyCapOfTheMemberTheBarmanIsBusyWithoutCallingTheModel(CapturedOutput output) {
+        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 500_000, 8, 1, 60), memory);
+        member(Language.ES);
+        llm.willReply("Primera.");
+
+        TalkResponse first = talkService.talk(USER_ID, HELLO, null, IP);
+        TalkResponse second = talkService.talk(USER_ID, HELLO, null, IP);
+
+        assertEquals(TalkSource.LLM, first.source());
+        assertBusy(second);
+        assertEquals(1, llm.calls().size());
+        assertTrue(output.getOut().contains("reason=member_cap"), output.getOut());
+    }
+
+    @Test
+    void pastTheDailyCapOfTheIpTheBarmanIsBusyWithoutCallingTheModel(CapturedOutput output) {
+        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 500_000, 8, 30, 1), memory);
+        member(Language.ES);
+        llm.willReply("Primera.");
+
+        talkService.talk(USER_ID, HELLO, null, IP);
+        TalkResponse second = talkService.talk(USER_ID, HELLO, null, IP);
+
+        assertBusy(second);
+        assertEquals(1, llm.calls().size());
+        assertTrue(output.getOut().contains("reason=ip_cap"), output.getOut());
+    }
+
+    @Test
+    void theIpOfTheRequestNeverReachesTheModelNorTheLogs(CapturedOutput output) {
+        member(Language.ES);
+        llm.willReply("Claro.");
+
+        talkService.talk(USER_ID, HELLO, null, IP);
+
+        assertFalse(llm.lastCall().systemPrompt().contains(IP));
+        assertFalse(output.getAll().contains(IP), output.getAll());
+    }
+
+    @Test
     void theRealTokensOfEveryAnswerAreChargedToTheDailyBudget() {
         member(Language.ES);
         llm.willReply("Claro.", 900, 60);
 
-        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals(900 + 5 * 60, budget.spentToday());
     }
@@ -91,7 +134,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willFail(new LlmUnavailableException(LlmUnavailableException.Reason.HTTP_5XX));
 
-        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals(0, budget.spentToday());
     }
@@ -99,13 +142,13 @@ class TalkServiceTest {
     @Test
     void theBudgetRunsOutAfterTheCallThatSpendsIt() {
         talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
-                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 1000, 8), memory);
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 1000, 8, 30, 60), memory);
         member(Language.ES);
         llm.willReply("Primera.", 900, 60);
         llm.willReply("Segunda.", 900, 60);
 
-        TalkResponse first = talkService.talk(USER_ID, HELLO, null);
-        TalkResponse second = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse first = talkService.talk(USER_ID, HELLO, null, IP);
+        TalkResponse second = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals(TalkSource.LLM, first.source());
         assertBusy(second);
@@ -118,8 +161,8 @@ class TalkServiceTest {
         llm.willReply("Un Gin Rickey.");
         llm.willReply("Con limón.");
 
-        talkService.talk(USER_ID, HELLO, null);
-        talkService.talk(USER_ID, "¿Y de qué es?", null);
+        talkService.talk(USER_ID, HELLO, null, IP);
+        talkService.talk(USER_ID, "¿Y de qué es?", null, IP);
 
         assertEquals(List.of(
                 new LlmTurn(LlmTurn.Role.USER, HELLO),
@@ -132,7 +175,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("  Hola\u0007,\r\n  buenas   noches ");
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals("Hola, buenas noches", response.text());
         assertEquals(List.of(
@@ -145,7 +188,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("a".repeat(500));
 
-        String shown = talkService.talk(USER_ID, HELLO, null).text();
+        String shown = talkService.talk(USER_ID, HELLO, null, IP).text();
 
         assertEquals(shown, memory.recent(USER_ID).get(1).text());
     }
@@ -156,8 +199,8 @@ class TalkServiceTest {
         llm.willFail(new LlmUnavailableException(LlmUnavailableException.Reason.TIMEOUT));
         llm.willFail(new IllegalStateException("boom"));
 
-        talkService.talk(USER_ID, HELLO, null);
-        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null, IP);
+        talkService.talk(USER_ID, HELLO, null, IP);
 
         assertTrue(memory.recent(USER_ID).isEmpty());
     }
@@ -167,7 +210,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply(" \n\t ");
 
-        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null, IP);
 
         assertTrue(memory.recent(USER_ID).isEmpty());
     }
@@ -175,10 +218,10 @@ class TalkServiceTest {
     @Test
     void nothingIsRememberedWhenTheBudgetIsSpent() {
         talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
-                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 0, 8), memory);
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 0, 8, 30, 60), memory);
         member(Language.ES);
 
-        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null, IP);
 
         assertTrue(memory.recent(USER_ID).isEmpty());
     }
@@ -189,12 +232,12 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("Para el primero.");
         llm.willReply("Para el segundo.");
-        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null, IP);
         when(userRepository.findById(other)).thenReturn(Optional.of(user(Language.ES)));
         when(barFacts.factsFor(other)).thenReturn(
                 new TalkFacts(DrinkResponse.menu(), 60, Rank.HABITUAL, 40, false));
 
-        talkService.talk(other, "Hola", null);
+        talkService.talk(other, "Hola", null, IP);
 
         assertEquals(List.of(new LlmTurn(LlmTurn.Role.USER, "Hola")), llm.lastCall().turns());
     }
@@ -204,7 +247,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("Un Gin Rickey: fresco y ligero. Lo tienes en la carta.");
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals(TalkSource.LLM, response.source());
         assertEquals("Un Gin Rickey: fresco y ligero. Lo tienes en la carta.", response.text());
@@ -216,7 +259,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willFail(new LlmUnavailableException(LlmUnavailableException.Reason.TIMEOUT));
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertBusy(response);
         assertTrue(output.getOut().contains("reason=timeout"), output.getOut());
@@ -227,7 +270,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willFail(new IllegalStateException("SECRETO-USUARIO"));
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertBusy(response);
         assertFalse(output.getAll().contains("SECRETO-USUARIO"), output.getAll());
@@ -238,7 +281,7 @@ class TalkServiceTest {
     void aDeletedAccountIsAnInvalidTokenAndNeverReachesTheModel() {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
-        assertThrows(InvalidTokenException.class, () -> talkService.talk(USER_ID, HELLO, null));
+        assertThrows(InvalidTokenException.class, () -> talkService.talk(USER_ID, HELLO, null, IP));
 
         verifyNoInteractions(barFacts);
         assertTrue(llm.calls().isEmpty());
@@ -249,7 +292,7 @@ class TalkServiceTest {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(Language.ES)));
         when(barFacts.factsFor(USER_ID)).thenThrow(new WalletNotFoundException());
 
-        assertThrows(WalletNotFoundException.class, () -> talkService.talk(USER_ID, HELLO, null));
+        assertThrows(WalletNotFoundException.class, () -> talkService.talk(USER_ID, HELLO, null, IP));
 
         assertTrue(llm.calls().isEmpty());
     }
@@ -259,7 +302,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("Claro.");
 
-        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null, IP);
 
         FakeLlmClient.Call call = llm.lastCall();
         assertEquals(List.of(new LlmTurn(LlmTurn.Role.USER, HELLO)), call.turns());
@@ -272,7 +315,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("Sure.");
 
-        talkService.talk(USER_ID, HELLO, Language.EN);
+        talkService.talk(USER_ID, HELLO, Language.EN, IP);
 
         assertTrue(llm.lastCall().systemPrompt().contains("- Responde en inglés,"));
         assertTrue(llm.lastCall().systemPrompt().contains("Shrutebucks"));
@@ -283,7 +326,7 @@ class TalkServiceTest {
         member(Language.EN);
         llm.willReply("Sure.");
 
-        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null, IP);
 
         assertTrue(llm.lastCall().systemPrompt().contains("- Responde en inglés,"));
     }
@@ -293,7 +336,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("  Hola\u0007,\r\n\n   buenas\t noches \u0000 ");
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals("Hola, buenas noches", response.text());
     }
@@ -303,7 +346,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("<b>Hola</b> <script>alert(1)</script>");
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals(TalkSource.LLM, response.source());
         assertEquals("<b>Hola</b> <script>alert(1)</script>", response.text());
@@ -314,7 +357,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply(" \n\t \u0007 ");
 
-        assertBusy(talkService.talk(USER_ID, HELLO, null));
+        assertBusy(talkService.talk(USER_ID, HELLO, null, IP));
     }
 
     @Test
@@ -322,7 +365,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply(null);
 
-        assertBusy(talkService.talk(USER_ID, HELLO, null));
+        assertBusy(talkService.talk(USER_ID, HELLO, null, IP));
     }
 
     @Test
@@ -331,7 +374,7 @@ class TalkServiceTest {
         String answer = "Una frase corta que se repite sin parar. ".repeat(15).trim();
         llm.willReply(answer);
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertTrue(response.text().length() <= 400);
         assertTrue(response.text().endsWith("."));
@@ -345,7 +388,7 @@ class TalkServiceTest {
         String answer = "Hola. ¿Qué tal? ¡Genial! Y sigo… " + "palabra ".repeat(60);
         llm.willReply(answer);
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals("Hola. ¿Qué tal? ¡Genial! Y sigo…", response.text());
     }
@@ -356,7 +399,7 @@ class TalkServiceTest {
         String answer = "palabra ".repeat(80).trim();
         llm.willReply(answer);
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertTrue(response.text().length() <= 400);
         assertTrue(response.text().endsWith("palabra…"));
@@ -367,7 +410,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("a".repeat(500));
 
-        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null, IP);
 
         assertEquals(400, response.text().length());
         assertTrue(response.text().endsWith("a…"));
@@ -379,7 +422,7 @@ class TalkServiceTest {
         String answer = "a".repeat(400);
         llm.willReply(answer);
 
-        assertEquals(answer, talkService.talk(USER_ID, HELLO, null).text());
+        assertEquals(answer, talkService.talk(USER_ID, HELLO, null, IP).text());
     }
 
     @Test
@@ -387,7 +430,7 @@ class TalkServiceTest {
         member(Language.ES);
         llm.willReply("a".repeat(398) + "😀😀😀");
 
-        String text = talkService.talk(USER_ID, HELLO, null).text();
+        String text = talkService.talk(USER_ID, HELLO, null, IP).text();
 
         assertTrue(text.length() <= 400);
         assertTrue(text.endsWith("…"));

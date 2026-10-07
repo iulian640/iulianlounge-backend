@@ -45,14 +45,14 @@ public class TalkService {
         this.talkMemory = talkMemory;
     }
 
-    public TalkResponse talk(UUID userId, String text, Language requested) {
+    public TalkResponse talk(UUID userId, String text, Language requested, String remoteAddress) {
         User user = userRepository.findById(userId).orElseThrow(InvalidTokenException::new);
         TalkFacts facts = barFacts.factsFor(userId);
         Language language = requested != null ? requested : user.getLocale();
         String systemPrompt = barmanPrompt.build(facts, language);
         List<LlmTurn> turns = withNewMessage(talkMemory.recent(userId), text);
         try {
-            LlmReply reply = talkBudget.spend(() -> llmClient.reply(systemPrompt, turns));
+            LlmReply reply = talkBudget.spend(userId, remoteAddress, () -> llmClient.reply(systemPrompt, turns));
             String answer = TalkText.clean(reply.text());
             if (answer.isEmpty()) {
                 return busy(facts, EMPTY);

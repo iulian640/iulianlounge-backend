@@ -40,6 +40,8 @@ class DisabledLlmClientTest {
         assertEquals("parse", LlmUnavailableException.Reason.PARSE.code());
         assertEquals("empty", LlmUnavailableException.Reason.EMPTY.code());
         assertEquals("budget", LlmUnavailableException.Reason.BUDGET.code());
+        assertEquals("member_cap", LlmUnavailableException.Reason.MEMBER_CAP.code());
+        assertEquals("ip_cap", LlmUnavailableException.Reason.IP_CAP.code());
         assertEquals("disabled", LlmUnavailableException.Reason.DISABLED.code());
     }
 }

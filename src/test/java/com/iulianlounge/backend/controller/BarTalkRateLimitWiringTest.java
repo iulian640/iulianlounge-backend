@@ -59,7 +59,7 @@ class BarTalkRateLimitWiringTest {
         member.setId(UUID.randomUUID());
         member.setRole(Role.USER);
         bearer = "Bearer " + jwtService.generateAccessToken(member);
-        when(talkService.talk(eq(member.getId()), any(), any())).thenReturn(TalkResponse.fallback("barman.busy"));
+        when(talkService.talk(eq(member.getId()), any(), any(), any())).thenReturn(TalkResponse.fallback("barman.busy"));
         when(barService.order(eq(member.getId()), eq(Drink.BATHTUB_GIN), any())).thenReturn(
                 new OrderResponse(Drink.BATHTUB_GIN, 5, 95, Rank.NADIE, false, false, "barman.serve.nadie"));
     }
@@ -109,7 +109,7 @@ class BarTalkRateLimitWiringTest {
         User other = new User();
         other.setId(UUID.randomUUID());
         other.setRole(Role.USER);
-        when(talkService.talk(eq(other.getId()), any(), any())).thenReturn(TalkResponse.fallback("barman.busy"));
+        when(talkService.talk(eq(other.getId()), any(), any(), any())).thenReturn(TalkResponse.fallback("barman.busy"));
 
         mockMvc.perform(post("/api/v1/bar/talk")
                         .header("Authorization", "Bearer " + jwtService.generateAccessToken(other))

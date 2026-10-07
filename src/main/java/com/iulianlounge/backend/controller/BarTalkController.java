@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import com.iulianlounge.backend.domain.Language;
@@ -26,8 +27,8 @@ public class BarTalkController {
 
     @PostMapping("/talk")
     public TalkResponse talk(@AuthenticationPrincipal(errorOnInvalidType = true) AccessTokenClaims claims,
-            @Valid @RequestBody TalkRequest request) {
+            @Valid @RequestBody TalkRequest request, HttpServletRequest http) {
         Language requested = request.locale() == null ? null : Language.fromCode(request.locale());
-        return talkService.talk(claims.userId(), request.text(), requested);
+        return talkService.talk(claims.userId(), request.text(), requested, http.getRemoteAddr());
     }
 }

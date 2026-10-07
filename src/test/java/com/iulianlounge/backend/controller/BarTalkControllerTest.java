@@ -24,7 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import com.iulianlounge.backend.config.ClockConfig;
 import com.iulianlounge.backend.config.SecurityConfig;
@@ -41,6 +41,8 @@ import com.iulianlounge.backend.service.TalkService;
 @Import({SecurityConfig.class, JwtService.class, ClockConfig.class})
 @TestPropertySource(properties = "jwt.secret=" + MeControllerTest.SECRET)
 class BarTalkControllerTest {
+
+    private static final String REMOTE = "127.0.0.1";
 
     @Autowired
     private MockMvc mockMvc;
@@ -64,7 +66,7 @@ class BarTalkControllerTest {
 
     @Test
     void theModelsAnswerIsA200WithTheTextAndNoLine() throws Exception {
-        when(talkService.talk(user.getId(), "¿Qué me recomiendas?", null))
+        when(talkService.talk(user.getId(), "¿Qué me recomiendas?", null, REMOTE))
                 .thenReturn(TalkResponse.llm("Un Gin Rickey, fresco y ligero."));
 
         String body = mockMvc.perform(talk("{\"text\":\"¿Qué me recomiendas?\"}"))
@@ -78,7 +80,7 @@ class BarTalkControllerTest {
 
     @Test
     void theFallbackIsA200WithTheBusyLineAndNoText() throws Exception {
-        when(talkService.talk(user.getId(), "hola", null)).thenReturn(TalkResponse.fallback("barman.busy"));
+        when(talkService.talk(user.getId(), "hola", null, REMOTE)).thenReturn(TalkResponse.fallback("barman.busy"));
 
         String body = mockMvc.perform(talk("{\"text\":\"hola\"}"))
                 .andExpect(status().isOk())
@@ -91,28 +93,53 @@ class BarTalkControllerTest {
 
     @Test
     void theMemberComesFromTheTokenNeverFromTheBody() throws Exception {
-        when(talkService.talk(any(), anyString(), any())).thenReturn(TalkResponse.fallback("barman.busy"));
+        when(talkService.talk(any(), anyString(), any(), any())).thenReturn(TalkResponse.fallback("barman.busy"));
 
         mockMvc.perform(talk("{\"text\":\"hola\",\"userId\":\"" + UUID.randomUUID() + "\"}"))
                 .andExpect(status().isOk());
 
-        verify(talkService).talk(user.getId(), "hola", null);
+        verify(talkService).talk(user.getId(), "hola", null, REMOTE);
+    }
+
+    @Test
+    void theAddressOfTheConnectionIsPassedOnForThePerIpCap() throws Exception {
+        when(talkService.talk(any(), anyString(), any(), anyString()))
+                .thenReturn(TalkResponse.fallback("barman.busy"));
+
+        mockMvc.perform(talk("{\"text\":\"hola\"}").with(request -> {
+            request.setRemoteAddr("203.0.113.9");
+            return request;
+        })).andExpect(status().isOk());
+
+        verify(talkService).talk(user.getId(), "hola", null, "203.0.113.9");
+    }
+
+    @Test
+    void anAddressInTheBodyOrInAHeaderIsNeverUsed() throws Exception {
+        when(talkService.talk(any(), anyString(), any(), anyString()))
+                .thenReturn(TalkResponse.fallback("barman.busy"));
+
+        mockMvc.perform(talk("{\"text\":\"hola\",\"ip\":\"198.51.100.1\"}")
+                        .header("X-Forwarded-For", "198.51.100.2"))
+                .andExpect(status().isOk());
+
+        verify(talkService).talk(user.getId(), "hola", null, REMOTE);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"es", "en"})
     void theLocaleOfTheRequestIsPassedOn(String locale) throws Exception {
-        when(talkService.talk(any(), anyString(), any())).thenReturn(TalkResponse.fallback("barman.busy"));
+        when(talkService.talk(any(), anyString(), any(), any())).thenReturn(TalkResponse.fallback("barman.busy"));
 
         mockMvc.perform(talk("{\"text\":\"hola\",\"locale\":\"" + locale + "\"}")).andExpect(status().isOk());
 
-        verify(talkService).talk(user.getId(), "hola", Language.fromCode(locale));
+        verify(talkService).talk(user.getId(), "hola", Language.fromCode(locale), REMOTE);
     }
 
     @Test
     void aTextOfExactlyTheLimitIsAccepted() throws Exception {
         String text = "a".repeat(280);
-        when(talkService.talk(user.getId(), text, null)).thenReturn(TalkResponse.fallback("barman.busy"));
+        when(talkService.talk(user.getId(), text, null, REMOTE)).thenReturn(TalkResponse.fallback("barman.busy"));
 
         mockMvc.perform(talk("{\"text\":\"" + text + "\"}")).andExpect(status().isOk());
     }
@@ -169,7 +196,7 @@ class BarTalkControllerTest {
     @Test
     void aTextOf560BytesIsAccepted() throws Exception {
         String text = "€".repeat(186) + "ab";
-        when(talkService.talk(user.getId(), text, null)).thenReturn(TalkResponse.fallback("barman.busy"));
+        when(talkService.talk(user.getId(), text, null, REMOTE)).thenReturn(TalkResponse.fallback("barman.busy"));
 
         mockMvc.perform(talk("{\"text\":\"" + text + "\"}")).andExpect(status().isOk());
     }
@@ -214,7 +241,7 @@ class BarTalkControllerTest {
 
     @Test
     void aTokenOfADeletedAccountIs401() throws Exception {
-        when(talkService.talk(user.getId(), "hola", null)).thenThrow(new InvalidTokenException());
+        when(talkService.talk(user.getId(), "hola", null, REMOTE)).thenThrow(new InvalidTokenException());
 
         mockMvc.perform(talk("{\"text\":\"hola\"}"))
                 .andExpect(status().isUnauthorized())
@@ -223,7 +250,7 @@ class BarTalkControllerTest {
 
     @Test
     void aMemberWithoutAWalletIs404() throws Exception {
-        when(talkService.talk(user.getId(), "hola", null)).thenThrow(new WalletNotFoundException());
+        when(talkService.talk(user.getId(), "hola", null, REMOTE)).thenThrow(new WalletNotFoundException());
 
         mockMvc.perform(talk("{\"text\":\"hola\"}"))
                 .andExpect(status().isNotFound())
@@ -232,7 +259,7 @@ class BarTalkControllerTest {
 
     @Test
     void anUnexpectedFailureOfOursIsA500WithoutDetails() throws Exception {
-        when(talkService.talk(user.getId(), "hola", null)).thenThrow(new IllegalStateException("SECRETO"));
+        when(talkService.talk(user.getId(), "hola", null, REMOTE)).thenThrow(new IllegalStateException("SECRETO"));
 
         String body = mockMvc.perform(talk("{\"text\":\"hola\"}"))
                 .andExpect(status().isInternalServerError())
@@ -242,7 +269,7 @@ class BarTalkControllerTest {
         assertFalse(body.contains("SECRETO"), body);
     }
 
-    private RequestBuilder talk(String body) {
+    private MockHttpServletRequestBuilder talk(String body) {
         return post("/api/v1/bar/talk")
                 .header("Authorization", bearer)
                 .contentType(MediaType.APPLICATION_JSON)
