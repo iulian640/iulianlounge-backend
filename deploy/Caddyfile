@@ -49,5 +49,6 @@
 
 # www → dominio desnudo
 www.{$DOMAIN} {
+	import security_headers
 	redir https://{$DOMAIN}{uri} permanent
 }
