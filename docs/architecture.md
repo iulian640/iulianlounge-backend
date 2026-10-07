@@ -16,6 +16,7 @@
 - Errores con `code` estable y enum `ErrorCode` (ADR-06).
 - Cartera con ledger append-only y bono de bienvenida (ADR-04).
 - **La Barra (ADR-10):** carta fija, pedido idempotente que se cobra del wallet, rango derivado de lo gastado y fiado diario de la casa.
+- **El blackjack (ADR-11):** una mano contra el crupier, con apuestas de 10, 20 o 50 fichas. El servidor baraja con `SecureRandom` y guarda el mazo y la carta oculta. La apuesta y el pago van al ledger con claves idempotentes y cada llamada reconcilia lo que se quedó a medias. Endpoints: `GET /blackjack`, `POST /blackjack/hands`, `POST /blackjack/hands/{id}/hit` y `POST /blackjack/hands/{id}/stand`.
 - Migraciones:
 
   | Migración | Qué hace |
@@ -26,8 +27,9 @@
   | V4 | `wallet` y `token_transaction` |
   | V5 | tipos de movimiento de la barra |
   | V6 | índice del gasto y signo ligado al tipo |
+  | V7 | `blackjack_hand` y los tipos `BLACKJACK_BET` y `BLACKJACK_PAYOUT` |
 
-- Fuera del PMV (épica IUL-54): blackjack, retos, tienda, incremental, social y la deuda del préstamo. Sus secciones se conservan como diseño, no como plan.
+- Fuera del PMV (épica IUL-54): retos, tienda, incremental, social y la deuda del préstamo. Sus secciones se conservan como diseño, no como plan.
 
 ---
 
@@ -121,9 +123,9 @@ Sin tablas nuevas: son **vistas de lectura** sobre lo que ya existe.
 
 ### 1.10 Diagrama ER (Mermaid)
 
-> **Diseño de Fase 0, no implementado salvo `users`, `wallet` y `token_transaction`** (y estas tres con
-> los tipos simplificados del diseño: en la BD real los ids son UUID). El ER real, sacado de las
-> migraciones V1-V6, está en [`diagramas.md`](diagramas.md#1-base-de-datos).
+> **Diseño de Fase 0, no implementado salvo `users`, `wallet`, `token_transaction` y `blackjack_hand`**
+> (y esta última sustituye a `GameSession` y a la `BlackjackHand` de este diseño, ver ADR-11; en la BD
+> real los ids son UUID). El ER real, sacado de las migraciones V1-V7, está en [`diagramas.md`](diagramas.md#1-base-de-datos).
 
 ```mermaid
 erDiagram
@@ -508,7 +510,7 @@ Expandidos a fecha 2026-07-14: [ADR-04](adr/ADR-04-ledger-append-only-saldo-mate
 
 **ADR-02 — Anti-trampas en katas: casos ocultos rotados con verificación de outputs en servidor (aceptada).** El cliente ejecuta la kata en un Web Worker contra casos ocultos que el servidor entrega *sin* los outputs esperados; el cliente devuelve sus outputs y el servidor compara contra los esperados que solo él conoce. Rotación de grupos de casos + rate limit (5 envíos/min) + pago único por reto hacen que el ataque por fuerza bruta de outputs sea más caro que resolver la kata. Alternativas descartadas: ejecutar JS en servidor (GraalVM/sandbox: superficie de ataque enorme para un junior), firma criptográfica de outputs en cliente (la clave estaría en el cliente: seguridad teatral). Se acepta explícitamente que un tramposo dedicado puede resolver el caso a mano: el umbral es "más esfuerzo trampear que resolver".
 
-**ADR-03 — Blackjack con autoridad total del servidor (aceptada).** El servidor baraja (SecureRandom), guarda el mazo en `stateJson` y expone solo el estado visible; el cliente es un mando a distancia que envía HIT/STAND. Implicaciones: cada acción es un round-trip (aceptable por turnos), el estado de sesión debe sobrevivir a reconexiones (GET de sesión abierta), y las apuestas se liquidan en la misma transacción de BD que el cambio de estado. Alternativa descartada: lógica en cliente con validación posterior — imposible de asegurar y pedagógicamente peor.
+**ADR-03 — Blackjack con autoridad total del servidor (aceptada, sustituida en parte por ADR-11).** Desde la regla 6 del ADR-04, `WalletService` abre su propia transacción en cada movimiento y se niega a correr dentro de otra, así que la apuesta ya no se liquida en la misma transacción que el estado de la mano. El ADR-11 lo sustituye por claves idempotentes y reconciliación en cada llamada; el resto (servidor con autoridad, `SecureRandom`, estado que sobrevive a una recarga) sigue igual. Texto original: El servidor baraja (SecureRandom), guarda el mazo en `stateJson` y expone solo el estado visible; el cliente es un mando a distancia que envía HIT/STAND. Implicaciones: cada acción es un round-trip (aceptable por turnos), el estado de sesión debe sobrevivir a reconexiones (GET de sesión abierta), y las apuestas se liquidan en la misma transacción de BD que el cambio de estado. Alternativa descartada: lógica en cliente con validación posterior — imposible de asegurar y pedagógicamente peor.
 
 **ADR-04 — Ledger append-only + saldo materializado con bloqueo optimista (aceptada).** `TokenTransaction` es la verdad auditable; `Wallet.balance` es la vista materializada que se actualiza en la misma transacción, protegida con `@Version` y reintento (1 reintento, luego 409). Saldo 100% derivado (SUM del ledger) descartado: cada apuesta escanearía el historial. Bloqueo pesimista (`SELECT FOR UPDATE`) descartado como defecto: con un solo usuario por cartera la contención real es su propio doble clic, que resuelve la idempotencyKey; el optimista enseña más y escala mejor.
 
