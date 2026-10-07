@@ -20,6 +20,6 @@ public interface TokenTransactionRepository extends Repository<TokenTransaction,
 
     Page<TokenTransaction> findByWalletIdOrderByCreatedAtDescIdDesc(UUID walletId, Pageable pageable);
 
-    @Query("select coalesce(sum(t.amount), 0) from TokenTransaction t where t.walletId = :walletId and t.type = :type")
+    @Query("select coalesce(sum(t.amount), 0L) from TokenTransaction t where t.walletId = :walletId and t.type = :type")
     long sumAmountByWalletIdAndType(@Param("walletId") UUID walletId, @Param("type") TransactionType type);
 }

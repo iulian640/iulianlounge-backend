@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -128,7 +129,20 @@ class WalletRepositoryTest {
     @ParameterizedTest
     @EnumSource(TransactionType.class)
     void everyMovementTypeFitsTheDatabaseCheck(TransactionType type) {
-        transactionRepository.saveAndFlush(new TokenTransaction(wallet.getId(), 10, type, 10, null, NOW));
+        long amount = type == TransactionType.BAR_ORDER ? -10 : 10;
+
+        transactionRepository.saveAndFlush(new TokenTransaction(wallet.getId(), amount, type, 10, null, NOW));
+    }
+
+    @Test
+    void databaseRejectsAnUnknownMovementType() {
+        assertThrows(PersistenceException.class, () -> insertMovement("PROPINA", 10));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"BAR_ORDER, 10", "WELCOME_BONUS, -10", "HOUSE_CREDIT, -10"})
+    void databaseRejectsAMovementWhoseSignDoesNotMatchItsType(String type, long amount) {
+        assertThrows(PersistenceException.class, () -> insertMovement(type, amount));
     }
 
     @Test
@@ -151,6 +165,18 @@ class WalletRepositoryTest {
         long sum = transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), TransactionType.BAR_ORDER);
 
         assertEquals(0, sum);
+    }
+
+    private void insertMovement(String type, long amount) {
+        entityManager.getEntityManager()
+                .createNativeQuery("""
+                        INSERT INTO token_transaction (id, wallet_id, amount, type, balance_after, created_at)
+                        VALUES (gen_random_uuid(), :walletId, :amount, :type, 10, now())
+                        """)
+                .setParameter("walletId", wallet.getId())
+                .setParameter("amount", amount)
+                .setParameter("type", type)
+                .executeUpdate();
     }
 
     private TokenTransaction movement(Wallet target, long amount, TransactionType type, long balanceAfter) {
