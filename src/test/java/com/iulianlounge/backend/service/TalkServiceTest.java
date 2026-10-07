@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -50,12 +51,63 @@ class TalkServiceTest {
     private UserRepository userRepository;
 
     private FakeLlmClient llm;
+    private TalkBudget budget;
     private TalkService talkService;
 
     @BeforeEach
     void setUp() {
         llm = new FakeLlmClient();
-        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt());
+        budget = new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 500_000, 8);
+        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(), budget);
+    }
+
+    @Test
+    void whenTheDailyBudgetIsSpentTheBarmanIsBusyWithoutCallingTheModel(CapturedOutput output) {
+        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 0, 8));
+        member(Language.ES);
+
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+
+        assertBusy(response);
+        assertTrue(llm.calls().isEmpty());
+        assertTrue(output.getOut().contains("reason=budget"), output.getOut());
+    }
+
+    @Test
+    void theRealTokensOfEveryAnswerAreChargedToTheDailyBudget() {
+        member(Language.ES);
+        llm.willReply("Claro.", 900, 60);
+
+        talkService.talk(USER_ID, HELLO, null);
+
+        assertEquals(900 + 5 * 60, budget.spentToday());
+    }
+
+    @Test
+    void aFailedCallChargesNothing() {
+        member(Language.ES);
+        llm.willFail(new LlmUnavailableException(LlmUnavailableException.Reason.HTTP_5XX));
+
+        talkService.talk(USER_ID, HELLO, null);
+
+        assertEquals(0, budget.spentToday());
+    }
+
+    @Test
+    void theBudgetRunsOutAfterTheCallThatSpendsIt() {
+        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 1000, 8));
+        member(Language.ES);
+        llm.willReply("Primera.", 900, 60);
+        llm.willReply("Segunda.", 900, 60);
+
+        TalkResponse first = talkService.talk(USER_ID, HELLO, null);
+        TalkResponse second = talkService.talk(USER_ID, HELLO, null);
+
+        assertEquals(TalkSource.LLM, first.source());
+        assertBusy(second);
+        assertEquals(1, llm.calls().size());
     }
 
     @Test

@@ -31,13 +31,15 @@ public class TalkService {
     private final UserRepository userRepository;
     private final LlmClient llmClient;
     private final BarmanPrompt barmanPrompt;
+    private final TalkBudget talkBudget;
 
     public TalkService(BarFacts barFacts, UserRepository userRepository, LlmClient llmClient,
-            BarmanPrompt barmanPrompt) {
+            BarmanPrompt barmanPrompt, TalkBudget talkBudget) {
         this.barFacts = barFacts;
         this.userRepository = userRepository;
         this.llmClient = llmClient;
         this.barmanPrompt = barmanPrompt;
+        this.talkBudget = talkBudget;
     }
 
     public TalkResponse talk(UUID userId, String text, Language requested) {
@@ -47,7 +49,7 @@ public class TalkService {
         String systemPrompt = barmanPrompt.build(facts, language);
         List<LlmTurn> turns = List.of(new LlmTurn(LlmTurn.Role.USER, text));
         try {
-            LlmReply reply = llmClient.reply(systemPrompt, turns);
+            LlmReply reply = talkBudget.spend(() -> llmClient.reply(systemPrompt, turns));
             String answer = TalkText.clean(reply.text());
             return answer.isEmpty() ? busy(facts, EMPTY) : TalkResponse.llm(answer);
         } catch (LlmUnavailableException e) {
