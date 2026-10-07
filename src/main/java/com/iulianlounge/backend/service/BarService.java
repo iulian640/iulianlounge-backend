@@ -62,7 +62,8 @@ public class BarService {
         if (walletService.hasMovement(userId, key)) {
             throw new HouseCreditUsedTodayException();
         }
-        TokenTransaction credit = walletService.credit(userId, HOUSE_CREDIT, TransactionType.HOUSE_CREDIT, key);
+        TokenTransaction credit = walletService.creditIf(userId, HOUSE_CREDIT, TransactionType.HOUSE_CREDIT, key,
+                BarService::isBroke, HouseCreditNotNeededException::new);
         Rank rank = rankOf(userId);
         return new HouseCreditResponse(HOUSE_CREDIT, credit.getBalanceAfter(), rank,
                 BarmanSituation.HOUSE_CREDIT.lineFor(rank));

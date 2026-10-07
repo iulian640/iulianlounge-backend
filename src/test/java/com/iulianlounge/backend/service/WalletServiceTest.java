@@ -196,6 +196,39 @@ class WalletServiceTest {
     }
 
     @Test
+    void creditIfAppliesTheCreditWhileTheBalanceAllowsIt() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(3)));
+        when(walletRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        when(transactionRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+
+        TokenTransaction movement = walletService.creditIf(USER_ID, 50, TransactionType.HOUSE_CREDIT, "dia-1",
+                balance -> balance < 5, IllegalStateException::new);
+
+        assertEquals(53, movement.getBalanceAfter());
+    }
+
+    @Test
+    void creditIfRefusesWhenTheBalanceDoesNotAllowIt() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+
+        assertThrows(IllegalStateException.class, () -> walletService.creditIf(USER_ID, 50,
+                TransactionType.HOUSE_CREDIT, "dia-1", balance -> balance < 5, IllegalStateException::new));
+        verify(transactionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void creditIfChecksTheBalanceAgainWhenItRetriesAfterAConflict() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(3)), Optional.of(walletWith(50)));
+        when(walletRepository.saveAndFlush(any()))
+                .thenThrow(new ObjectOptimisticLockingFailureException(Wallet.class, WALLET_ID));
+
+        assertThrows(IllegalStateException.class, () -> walletService.creditIf(USER_ID, 50,
+                TransactionType.HOUSE_CREDIT, "dia-2", balance -> balance < 5, IllegalStateException::new));
+        verify(walletRepository, times(1)).saveAndFlush(any());
+        verify(transactionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void userWithoutWalletIsAnError() {
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
 

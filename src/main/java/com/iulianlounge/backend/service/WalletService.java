@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.LongPredicate;
 import java.util.function.Supplier;
 
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -28,6 +29,8 @@ public class WalletService {
 
     public static final long WELCOME_BONUS = 100;
 
+    private static final LongPredicate ANY_BALANCE = balance -> true;
+
     private final WalletRepository walletRepository;
     private final TokenTransactionRepository transactionRepository;
     private final TransactionOperations transactions;
@@ -49,15 +52,20 @@ public class WalletService {
     }
 
     public TokenTransaction credit(UUID userId, long amount, TransactionType type, String idempotencyKey) {
+        return creditIf(userId, amount, type, idempotencyKey, ANY_BALANCE, null);
+    }
+
+    public TokenTransaction creditIf(UUID userId, long amount, TransactionType type, String idempotencyKey,
+            LongPredicate allowedBalance, Supplier<? extends RuntimeException> refusal) {
         requireOwnTransaction();
         requirePositive(amount);
-        return withOneRetry(() -> applyTo(userId, amount, type, idempotencyKey));
+        return withOneRetry(() -> applyTo(userId, amount, type, idempotencyKey, allowedBalance, refusal));
     }
 
     public TokenTransaction debit(UUID userId, long amount, TransactionType type, String idempotencyKey) {
         requireOwnTransaction();
         requirePositive(amount);
-        return withOneRetry(() -> applyTo(userId, -amount, type, idempotencyKey));
+        return withOneRetry(() -> applyTo(userId, -amount, type, idempotencyKey, ANY_BALANCE, null));
     }
 
     public long getBalance(UUID userId) {
@@ -81,7 +89,8 @@ public class WalletService {
         return transactionRepository.findByWalletIdOrderByCreatedAtDescIdDesc(findWallet(userId).getId(), pageable);
     }
 
-    private TokenTransaction applyTo(UUID userId, long signedAmount, TransactionType type, String idempotencyKey) {
+    private TokenTransaction applyTo(UUID userId, long signedAmount, TransactionType type, String idempotencyKey,
+            LongPredicate allowedBalance, Supplier<? extends RuntimeException> refusal) {
         Wallet wallet = findWallet(userId);
 
         if (idempotencyKey != null) {
@@ -93,6 +102,9 @@ public class WalletService {
                 }
                 return previous.get();
             }
+        }
+        if (!allowedBalance.test(wallet.getBalance())) {
+            throw refusal.get();
         }
         return apply(wallet, signedAmount, type, idempotencyKey);
     }

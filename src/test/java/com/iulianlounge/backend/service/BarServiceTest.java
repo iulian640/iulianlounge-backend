@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -157,7 +158,8 @@ class BarServiceTest {
     void theHouseLendsFiftyChipsUnderTodaysKey() {
         when(walletService.getBalance(USER_ID)).thenReturn(3L);
         when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
-        when(walletService.credit(USER_ID, BarService.HOUSE_CREDIT, TransactionType.HOUSE_CREDIT, TODAYS_CREDIT))
+        when(walletService.creditIf(eq(USER_ID), eq(BarService.HOUSE_CREDIT), eq(TransactionType.HOUSE_CREDIT),
+                eq(TODAYS_CREDIT), any(), any()))
                 .thenReturn(new TokenTransaction(UUID.randomUUID(), 50, TransactionType.HOUSE_CREDIT, 53,
                         TODAYS_CREDIT, NIGHT_IN_MADRID));
         when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(97L);
@@ -175,7 +177,7 @@ class BarServiceTest {
         when(walletService.getBalance(USER_ID)).thenReturn(5L);
 
         assertThrows(HouseCreditNotNeededException.class, () -> barService.houseCredit(USER_ID));
-        verify(walletService, never()).credit(any(), anyLong(), any(), any());
+        verify(walletService, never()).creditIf(any(), anyLong(), any(), any(), any(), any());
     }
 
     @Test
@@ -184,7 +186,7 @@ class BarServiceTest {
         when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(true);
 
         assertThrows(HouseCreditUsedTodayException.class, () -> barService.houseCredit(USER_ID));
-        verify(walletService, never()).credit(any(), anyLong(), any(), any());
+        verify(walletService, never()).creditIf(any(), anyLong(), any(), any(), any(), any());
     }
 
     @Test
