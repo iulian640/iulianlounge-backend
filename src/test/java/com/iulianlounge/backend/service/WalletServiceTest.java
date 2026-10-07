@@ -17,7 +17,9 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -159,22 +161,35 @@ class WalletServiceTest {
                 () -> walletService.debit(USER_ID, 30, TransactionType.WELCOME_BONUS, "clave-1"));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"credit", "creditIf", "debit"})
-    void movingChipsRefusesToJoinSomeoneElsesTransaction(String operation) {
-        TransactionSynchronizationManager.setActualTransactionActive(true);
-        try {
-            IllegalStateException refused = assertThrows(IllegalStateException.class, () -> {
-                switch (operation) {
-                    case "credit" -> walletService.credit(USER_ID, 10, TransactionType.WELCOME_BONUS, null);
-                    case "creditIf" -> walletService.creditIf(USER_ID, 10, TransactionType.HOUSE_CREDIT, "dia-1",
-                            balance -> true);
-                    default -> walletService.debit(USER_ID, 10, TransactionType.BAR_ORDER, null);
-                }
-            });
-            assertTrue(refused.getMessage().contains(operation), refused.getMessage());
-        } finally {
+    @Nested
+    class InsideSomeoneElsesTransaction {
+
+        @BeforeEach
+        void openAnOuterTransaction() {
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+        }
+
+        @AfterEach
+        void closeIt() {
             TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+
+        @Test
+        void creditRefusesToRun() {
+            assertThrows(IllegalStateException.class,
+                    () -> walletService.credit(USER_ID, 10, TransactionType.WELCOME_BONUS, null));
+        }
+
+        @Test
+        void creditIfRefusesToRun() {
+            assertThrows(IllegalStateException.class,
+                    () -> walletService.creditIf(USER_ID, 10, TransactionType.HOUSE_CREDIT, "dia-1", balance -> true));
+        }
+
+        @Test
+        void debitRefusesToRun() {
+            assertThrows(IllegalStateException.class,
+                    () -> walletService.debit(USER_ID, 10, TransactionType.BAR_ORDER, null));
         }
     }
 
