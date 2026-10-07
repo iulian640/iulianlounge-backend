@@ -1,5 +1,6 @@
 package com.iulianlounge.backend.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,14 +33,16 @@ public class TalkService {
     private final LlmClient llmClient;
     private final BarmanPrompt barmanPrompt;
     private final TalkBudget talkBudget;
+    private final TalkMemory talkMemory;
 
     public TalkService(BarFacts barFacts, UserRepository userRepository, LlmClient llmClient,
-            BarmanPrompt barmanPrompt, TalkBudget talkBudget) {
+            BarmanPrompt barmanPrompt, TalkBudget talkBudget, TalkMemory talkMemory) {
         this.barFacts = barFacts;
         this.userRepository = userRepository;
         this.llmClient = llmClient;
         this.barmanPrompt = barmanPrompt;
         this.talkBudget = talkBudget;
+        this.talkMemory = talkMemory;
     }
 
     public TalkResponse talk(UUID userId, String text, Language requested) {
@@ -47,16 +50,26 @@ public class TalkService {
         TalkFacts facts = barFacts.factsFor(userId);
         Language language = requested != null ? requested : user.getLocale();
         String systemPrompt = barmanPrompt.build(facts, language);
-        List<LlmTurn> turns = List.of(new LlmTurn(LlmTurn.Role.USER, text));
+        List<LlmTurn> turns = withNewMessage(talkMemory.recent(userId), text);
         try {
             LlmReply reply = talkBudget.spend(() -> llmClient.reply(systemPrompt, turns));
             String answer = TalkText.clean(reply.text());
-            return answer.isEmpty() ? busy(facts, EMPTY) : TalkResponse.llm(answer);
+            if (answer.isEmpty()) {
+                return busy(facts, EMPTY);
+            }
+            talkMemory.remember(userId, text, answer);
+            return TalkResponse.llm(answer);
         } catch (LlmUnavailableException e) {
             return busy(facts, e.reason().code());
         } catch (RuntimeException e) {
             return busy(facts, UNEXPECTED);
         }
+    }
+
+    private static List<LlmTurn> withNewMessage(List<LlmTurn> window, String text) {
+        List<LlmTurn> turns = new ArrayList<>(window);
+        turns.add(new LlmTurn(LlmTurn.Role.USER, text));
+        return List.copyOf(turns);
     }
 
     private static TalkResponse busy(TalkFacts facts, String reason) {

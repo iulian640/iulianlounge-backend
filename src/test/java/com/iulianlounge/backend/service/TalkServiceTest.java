@@ -52,19 +52,21 @@ class TalkServiceTest {
 
     private FakeLlmClient llm;
     private TalkBudget budget;
+    private TalkMemory memory;
     private TalkService talkService;
 
     @BeforeEach
     void setUp() {
         llm = new FakeLlmClient();
+        memory = new TalkMemory(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")));
         budget = new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 500_000, 8);
-        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(), budget);
+        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(), budget, memory);
     }
 
     @Test
     void whenTheDailyBudgetIsSpentTheBarmanIsBusyWithoutCallingTheModel(CapturedOutput output) {
         talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
-                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 0, 8));
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 0, 8), memory);
         member(Language.ES);
 
         TalkResponse response = talkService.talk(USER_ID, HELLO, null);
@@ -97,7 +99,7 @@ class TalkServiceTest {
     @Test
     void theBudgetRunsOutAfterTheCallThatSpendsIt() {
         talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
-                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 1000, 8));
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 1000, 8), memory);
         member(Language.ES);
         llm.willReply("Primera.", 900, 60);
         llm.willReply("Segunda.", 900, 60);
@@ -108,6 +110,93 @@ class TalkServiceTest {
         assertEquals(TalkSource.LLM, first.source());
         assertBusy(second);
         assertEquals(1, llm.calls().size());
+    }
+
+    @Test
+    void afterAGoodAnswerTheNextMessageCarriesTheWindowOfTheConversation() {
+        member(Language.ES);
+        llm.willReply("Un Gin Rickey.");
+        llm.willReply("Con limón.");
+
+        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, "¿Y de qué es?", null);
+
+        assertEquals(List.of(
+                new LlmTurn(LlmTurn.Role.USER, HELLO),
+                new LlmTurn(LlmTurn.Role.ASSISTANT, "Un Gin Rickey."),
+                new LlmTurn(LlmTurn.Role.USER, "¿Y de qué es?")), llm.lastCall().turns());
+    }
+
+    @Test
+    void whatIsRememberedIsTheCleanedAndCutTextTheMemberSaw() {
+        member(Language.ES);
+        llm.willReply("  Hola\u0007,\r\n  buenas   noches ");
+
+        TalkResponse response = talkService.talk(USER_ID, HELLO, null);
+
+        assertEquals("Hola, buenas noches", response.text());
+        assertEquals(List.of(
+                new LlmTurn(LlmTurn.Role.USER, HELLO),
+                new LlmTurn(LlmTurn.Role.ASSISTANT, "Hola, buenas noches")), memory.recent(USER_ID));
+    }
+
+    @Test
+    void aLongAnswerIsRememberedAlreadyCut() {
+        member(Language.ES);
+        llm.willReply("a".repeat(500));
+
+        String shown = talkService.talk(USER_ID, HELLO, null).text();
+
+        assertEquals(shown, memory.recent(USER_ID).get(1).text());
+    }
+
+    @Test
+    void nothingIsRememberedAfterAFailure() {
+        member(Language.ES);
+        llm.willFail(new LlmUnavailableException(LlmUnavailableException.Reason.TIMEOUT));
+        llm.willFail(new IllegalStateException("boom"));
+
+        talkService.talk(USER_ID, HELLO, null);
+        talkService.talk(USER_ID, HELLO, null);
+
+        assertTrue(memory.recent(USER_ID).isEmpty());
+    }
+
+    @Test
+    void nothingIsRememberedWhenTheAnswerIsEmptyOnceCleaned() {
+        member(Language.ES);
+        llm.willReply(" \n\t ");
+
+        talkService.talk(USER_ID, HELLO, null);
+
+        assertTrue(memory.recent(USER_ID).isEmpty());
+    }
+
+    @Test
+    void nothingIsRememberedWhenTheBudgetIsSpent() {
+        talkService = new TalkService(barFacts, userRepository, llm, new BarmanPrompt(),
+                new TalkBudget(new SettableClock(Instant.parse("2026-10-07T20:00:00Z")), 0, 8), memory);
+        member(Language.ES);
+
+        talkService.talk(USER_ID, HELLO, null);
+
+        assertTrue(memory.recent(USER_ID).isEmpty());
+    }
+
+    @Test
+    void theConversationOfOneMemberNeverReachesAnother() {
+        UUID other = UUID.randomUUID();
+        member(Language.ES);
+        llm.willReply("Para el primero.");
+        llm.willReply("Para el segundo.");
+        talkService.talk(USER_ID, HELLO, null);
+        when(userRepository.findById(other)).thenReturn(Optional.of(user(Language.ES)));
+        when(barFacts.factsFor(other)).thenReturn(
+                new TalkFacts(DrinkResponse.menu(), 60, Rank.HABITUAL, 40, false));
+
+        talkService.talk(other, "Hola", null);
+
+        assertEquals(List.of(new LlmTurn(LlmTurn.Role.USER, "Hola")), llm.lastCall().turns());
     }
 
     @Test
