@@ -14,7 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.iulianlounge.backend.domain.Rank;
 import com.iulianlounge.backend.domain.Language;
-import com.iulianlounge.backend.domain.Role;
+import com.iulianlounge.backend.domain.TransactionType;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.MeResponse;
 import com.iulianlounge.backend.exception.InvalidTokenException;
@@ -26,15 +26,16 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private WalletService walletService;
+
     @Test
     void getProfileReturnsUserDataWithStartingRank() {
-        User user = new User();
-        user.setId(UUID.randomUUID());
-        user.setUsername("cursaito");
-        user.setLocale(Language.ES);
+        User user = cursaito();
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(walletService.spentOn(user.getId(), TransactionType.BAR_ORDER)).thenReturn(0L);
 
-        MeResponse profile = new UserService(userRepository).getProfile(user.getId());
+        MeResponse profile = new UserService(userRepository, walletService).getProfile(user.getId());
 
         assertEquals(user.getId(), profile.userId());
         assertEquals("cursaito", profile.username());
@@ -43,10 +44,30 @@ class UserServiceTest {
     }
 
     @Test
+    void getProfileDerivesTheRankFromWhatWasSpentAtTheBar() {
+        User user = cursaito();
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(walletService.spentOn(user.getId(), TransactionType.BAR_ORDER)).thenReturn(30L);
+
+        MeResponse profile = new UserService(userRepository, walletService).getProfile(user.getId());
+
+        assertEquals(Rank.HABITUAL, profile.rank());
+    }
+
+    @Test
     void getProfileOfDeletedAccountIsAnInvalidToken() {
         UUID deleted = UUID.randomUUID();
         when(userRepository.findById(deleted)).thenReturn(Optional.empty());
 
-        assertThrows(InvalidTokenException.class, () -> new UserService(userRepository).getProfile(deleted));
+        assertThrows(InvalidTokenException.class,
+                () -> new UserService(userRepository, walletService).getProfile(deleted));
+    }
+
+    private static User cursaito() {
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setUsername("cursaito");
+        user.setLocale(Language.ES);
+        return user;
     }
 }
