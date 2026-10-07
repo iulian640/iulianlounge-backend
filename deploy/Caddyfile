@@ -30,6 +30,9 @@
 
 	# La API y el health, al backend por la red interna de Docker
 	handle /api/* {
+		request_body {
+			max_size 16KB
+		}
 		reverse_proxy backend:8080
 	}
 	handle /actuator/health {
