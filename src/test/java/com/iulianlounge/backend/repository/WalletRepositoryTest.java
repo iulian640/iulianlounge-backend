@@ -131,6 +131,32 @@ class WalletRepositoryTest {
         transactionRepository.saveAndFlush(new TokenTransaction(wallet.getId(), 10, type, 10, null, NOW));
     }
 
+    @Test
+    void addsUpTheMovementsOfOneTypeInOneWallet() {
+        Wallet other = walletRepository.saveAndFlush(new Wallet(newUser("dwight").getId(), NOW));
+        transactionRepository.saveAndFlush(movement(wallet, 100, TransactionType.WELCOME_BONUS, 100));
+        transactionRepository.saveAndFlush(movement(wallet, -40, TransactionType.BAR_ORDER, 60));
+        transactionRepository.saveAndFlush(movement(wallet, -10, TransactionType.BAR_ORDER, 50));
+        transactionRepository.saveAndFlush(movement(other, -25, TransactionType.BAR_ORDER, 75));
+
+        long sum = transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), TransactionType.BAR_ORDER);
+
+        assertEquals(-50, sum);
+    }
+
+    @Test
+    void theSumIsZeroWithoutMovementsOfThatType() {
+        transactionRepository.saveAndFlush(movement(wallet, 100, TransactionType.WELCOME_BONUS, 100));
+
+        long sum = transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), TransactionType.BAR_ORDER);
+
+        assertEquals(0, sum);
+    }
+
+    private TokenTransaction movement(Wallet target, long amount, TransactionType type, long balanceAfter) {
+        return new TokenTransaction(target.getId(), amount, type, balanceAfter, null, NOW);
+    }
+
     private TokenTransaction welcome(Wallet target, String idempotencyKey) {
         return new TokenTransaction(target.getId(), 100, TransactionType.WELCOME_BONUS, 100, idempotencyKey, NOW);
     }

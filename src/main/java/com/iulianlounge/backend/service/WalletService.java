@@ -63,6 +63,18 @@ public class WalletService {
         return findWallet(userId).getBalance();
     }
 
+    public long spentOn(UUID userId, TransactionType type) {
+        return walletRepository.findByUserId(userId)
+                .map(wallet -> -transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), type))
+                .orElse(0L);
+    }
+
+    public boolean hasMovement(UUID userId, String idempotencyKey) {
+        return walletRepository.findByUserId(userId)
+                .flatMap(wallet -> transactionRepository.findByWalletIdAndIdempotencyKey(wallet.getId(), idempotencyKey))
+                .isPresent();
+    }
+
     public Page<TokenTransaction> getTransactions(UUID userId, Pageable pageable) {
         return transactionRepository.findByWalletIdOrderByCreatedAtDescIdDesc(findWallet(userId).getId(), pageable);
     }

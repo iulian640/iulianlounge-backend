@@ -1,8 +1,10 @@
 package com.iulianlounge.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -205,6 +207,48 @@ class WalletServiceTest {
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(123)));
 
         assertEquals(123, walletService.getBalance(USER_ID));
+    }
+
+    @Test
+    void spentOnTurnsTheDebitsOfATypeIntoAPositiveAmount() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+        when(transactionRepository.sumAmountByWalletIdAndType(WALLET_ID, TransactionType.BAR_ORDER))
+                .thenReturn(-50L);
+
+        assertEquals(50, walletService.spentOn(USER_ID, TransactionType.BAR_ORDER));
+    }
+
+    @Test
+    void spentOnIsZeroForAUserWithoutWallet() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+        assertEquals(0, walletService.spentOn(USER_ID, TransactionType.BAR_ORDER));
+    }
+
+    @Test
+    void hasMovementFindsAKeyInTheUsersWallet() {
+        String key = "house-credit:2026-10-07";
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+        when(transactionRepository.findByWalletIdAndIdempotencyKey(WALLET_ID, key)).thenReturn(Optional.of(
+                new TokenTransaction(WALLET_ID, 50, TransactionType.HOUSE_CREDIT, 50, key, NOW)));
+
+        assertTrue(walletService.hasMovement(USER_ID, key));
+    }
+
+    @Test
+    void hasMovementIsFalseWhenTheKeyIsNotInTheWallet() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.of(walletWith(50)));
+        when(transactionRepository.findByWalletIdAndIdempotencyKey(WALLET_ID, "house-credit:2026-10-07"))
+                .thenReturn(Optional.empty());
+
+        assertFalse(walletService.hasMovement(USER_ID, "house-credit:2026-10-07"));
+    }
+
+    @Test
+    void hasMovementIsFalseForAUserWithoutWallet() {
+        when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+        assertFalse(walletService.hasMovement(USER_ID, "house-credit:2026-10-07"));
     }
 
     private static Wallet walletWith(long balance) {
