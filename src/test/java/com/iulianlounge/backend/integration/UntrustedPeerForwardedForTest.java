@@ -16,7 +16,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
         "jwt.secret=dGVzdC1zZWNyZXQtcXVlLXRpZW5lLW1hcy1kZS0zMi1ieXRlcyEh",
         "auth.rate-limit.max-per-minute=2",
         "server.forward-headers-strategy=native",
-        "server.tomcat.remoteip.internal-proxies=192\\.0\\.2\\.1"
+        "server.tomcat.remoteip.internal-proxies=192.0.2.1"
 })
 class UntrustedPeerForwardedForTest {
 
