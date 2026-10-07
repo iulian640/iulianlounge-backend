@@ -20,6 +20,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 final class FixedWindowCounter {
 
+    enum WhenFull { REJECT, LET_THROUGH }
+
     static final Duration WINDOW = Duration.ofMinutes(1);
     static final int DEFAULT_MAX_TRACKED_KEYS = 10_000;
     private static final Duration SWEEP_INTERVAL = Duration.ofSeconds(1);
@@ -27,19 +29,21 @@ final class FixedWindowCounter {
     private final int maxRequestsPerWindow;
     private final Clock clock;
     private final int maxTrackedKeys;
+    private final WhenFull whenFull;
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
     private volatile Instant lastSweep = Instant.MIN;
 
-    FixedWindowCounter(int maxRequestsPerWindow, Clock clock, int maxTrackedKeys) {
+    FixedWindowCounter(int maxRequestsPerWindow, Clock clock, int maxTrackedKeys, WhenFull whenFull) {
         this.maxRequestsPerWindow = maxRequestsPerWindow;
         this.clock = clock;
         this.maxTrackedKeys = maxTrackedKeys;
+        this.whenFull = whenFull;
     }
 
     boolean tryAcquire(String key) {
         Instant now = clock.instant();
         if (!windows.containsKey(key) && isFull(now)) {
-            return false;
+            return whenFull == WhenFull.LET_THROUGH;
         }
         Window window = windows.compute(key, (k, current) -> current == null || current.isExpired(now)
                 ? new Window(now, 1)

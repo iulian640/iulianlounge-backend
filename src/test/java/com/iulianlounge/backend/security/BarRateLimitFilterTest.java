@@ -1,6 +1,7 @@
 package com.iulianlounge.backend.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -94,13 +95,26 @@ class BarRateLimitFilterTest {
 
     @Test
     void anAnonymousRequestPassesThroughSoSecurityCanAnswer401() throws Exception {
-        MockFilterChain chain = new MockFilterChain();
+        MockFilterChain chain = null;
         for (int i = 0; i <= LIMIT; i++) {
             chain = new MockFilterChain();
             filter.doFilter(new MockHttpServletRequest("POST", ORDERS), new MockHttpServletResponse(), chain);
         }
 
-        assertTrue(chain.getRequest() != null);
+        assertNotNull(chain.getRequest());
+    }
+
+    @Test
+    void whenTrackingIsFullNewMembersAreLetThroughInsteadOfLockingEveryoneOut() throws Exception {
+        filter = new BarRateLimitFilter(LIMIT, Clock.fixed(Instant.parse("2026-10-07T20:00:00Z"), ZoneOffset.UTC), 2);
+        UUID first = UUID.randomUUID();
+        send("POST", ORDERS, first);
+        send("POST", ORDERS, UUID.randomUUID());
+
+        assertEquals(200, send("POST", ORDERS, UUID.randomUUID()).getStatus());
+        send("POST", ORDERS, first);
+        send("POST", ORDERS, first);
+        assertEquals(429, send("POST", ORDERS, first).getStatus());
     }
 
     private MockHttpServletResponse send(String method, String path, UUID member) throws Exception {

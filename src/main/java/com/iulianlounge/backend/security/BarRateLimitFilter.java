@@ -22,7 +22,12 @@ public class BarRateLimitFilter extends OncePerRequestFilter {
     private final FixedWindowCounter counter;
 
     public BarRateLimitFilter(int maxRequestsPerWindow, Clock clock) {
-        this.counter = new FixedWindowCounter(maxRequestsPerWindow, clock, FixedWindowCounter.DEFAULT_MAX_TRACKED_KEYS);
+        this(maxRequestsPerWindow, clock, FixedWindowCounter.DEFAULT_MAX_TRACKED_KEYS);
+    }
+
+    BarRateLimitFilter(int maxRequestsPerWindow, Clock clock, int maxTrackedKeys) {
+        this.counter = new FixedWindowCounter(maxRequestsPerWindow, clock, maxTrackedKeys,
+                FixedWindowCounter.WhenFull.LET_THROUGH);
     }
 
     @Override

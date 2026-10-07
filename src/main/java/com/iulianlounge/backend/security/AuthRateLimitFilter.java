@@ -25,7 +25,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     AuthRateLimitFilter(int maxRequestsPerWindow, Clock clock, int maxTrackedKeys) {
-        this.counter = new FixedWindowCounter(maxRequestsPerWindow, clock, maxTrackedKeys);
+        this.counter = new FixedWindowCounter(maxRequestsPerWindow, clock, maxTrackedKeys,
+                FixedWindowCounter.WhenFull.REJECT);
     }
 
     @Override
