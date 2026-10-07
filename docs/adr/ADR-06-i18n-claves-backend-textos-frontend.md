@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceptada — 2026-07-03. Enmendada el 2026-09-23 (ver Historial). El campo
+Aceptada — 2026-07-03. Enmendada el 2026-09-23 y el 2026-10-07 (ver Historial). El campo
 `code`, el enum `ErrorCode` y las claves de validación
 (`validation.<restricción>`, p. ej. `validation.not_blank`) se implementaron
 el 2026-09-25. Los errores que genera Spring (JSON roto, 405...) llevan
@@ -69,10 +69,14 @@ clave. Es la única excepción a la regla, y está acotada:
 - Si la respuesta sale del **catálogo** de frases (fallback por reglas), el
   backend manda una clave y el frontend busca la frase en su diccionario.
 - Si sale del **LLM**, el backend manda el texto tal cual, generado ya en el
-  idioma del usuario gracias a `User.locale` en el system prompt.
+  idioma del usuario (el `locale` de la petición o, si no llega,
+  `User.locale`, en el system prompt).
 
-El campo `source` (`"llm"` o `"catalogo"`) de la respuesta le dice al
-frontend qué hacer con ella.
+El campo `source` (`LLM` o `FALLBACK`, enum `TalkSource`) de la respuesta le
+dice al frontend qué hacer con ella. Con `LLM` llega el texto en `text`; con
+`FALLBACK` llega la clave del catálogo en `line` (`barman.busy`) y `text` va
+a `null`. Siempre llega exactamente uno de los dos. Detalle del contrato en la
+enmienda del 2026-10-07 de [ADR-05](ADR-05-barman-llm-function-calling-lista-blanca.md).
 
 ## Alternativas consideradas
 
@@ -115,3 +119,6 @@ frontend qué hacer con ella.
   frases en castellano. Se concreta el formato (`code` + `detail` en inglés +
   `errors` por campo), se centralizan los códigos en `ErrorCode` y se
   documenta la excepción del texto generado por el LLM.
+- 2026-10-07: el campo `source` pasa de `"llm"`/`"catalogo"` a los valores del
+  enum `TalkSource` (`LLM`/`FALLBACK`), y la respuesta lleva `text` o `line`
+  según el caso (enmienda de ADR-05).
