@@ -322,11 +322,22 @@ classDiagram
     class SecurityConfig {
         <<Configuration>>
         +passwordEncoder() PasswordEncoder
-        +securityFilterChain(HttpSecurity, JwtService, int, ObjectProvider~Clock~) SecurityFilterChain
+        +securityFilterChain(HttpSecurity, JwtService, int, int, ObjectProvider~Clock~) SecurityFilterChain
     }
-    class AuthRateLimitFilter {
+    class FixedWindowCounter {
         -int maxRequestsPerWindow
         -Clock clock
+        -int maxTrackedKeys
+        ~tryAcquire(String) boolean
+        ~rejectTooManyRequests(HttpServletResponse, ErrorCode)$
+    }
+    class AuthRateLimitFilter {
+        -FixedWindowCounter counter
+        #shouldNotFilter(HttpServletRequest) boolean
+        #doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain)
+    }
+    class BarRateLimitFilter {
+        -FixedWindowCounter counter
         #shouldNotFilter(HttpServletRequest) boolean
         #doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain)
     }
@@ -365,6 +376,7 @@ classDiagram
         AUTH_REQUIRED
         AUTH_TOO_MANY_REQUESTS
         WALLET_INSUFFICIENT_FUNDS
+        BAR_TOO_MANY_REQUESTS
         -String key
         -HttpStatus status
         -String detail
@@ -376,10 +388,14 @@ classDiagram
 
     SecurityConfig ..> AuthRateLimitFilter : new, primero
     SecurityConfig ..> JwtAuthenticationFilter : new, después
+    SecurityConfig ..> BarRateLimitFilter : new, tras el JWT
+    AuthRateLimitFilter --> FixedWindowCounter
+    BarRateLimitFilter --> FixedWindowCounter
+    BarRateLimitFilter ..> AccessTokenClaims : userId del SecurityContext
     SecurityConfig ..> ProblemDetailAuthenticationEntryPoint : new, 401 auth.required
     JwtAuthenticationFilter --> JwtService
     JwtService ..> AccessTokenClaims : devuelve
-    AuthRateLimitFilter ..> ErrorCode : 429 a mano
+    FixedWindowCounter ..> ErrorCode : 429 a mano
     ProblemDetailAuthenticationEntryPoint ..> ErrorCode : 401 a mano
     ResponseEntityExceptionHandler <|-- GlobalExceptionHandler
     GlobalExceptionHandler ..> ApiException : la traduce
@@ -387,11 +403,12 @@ classDiagram
     ErrorCode ..> ProblemDetail : RFC 7807
 ```
 
+- `FixedWindowCounter` es la ventana de un minuto que comparten los dos filtros de límite. `BarRateLimitFilter` va después del filtro JWT y cuenta por `userId` los `POST /api/v1/bar/**` (pedidos y fiado juntos, 30 por minuto por defecto, `bar.rate-limit.max-per-minute`); a partir de ahí responde 429 `bar.too_many_requests`. La carta (`GET /api/v1/bar`) no tiene límite. Sin sesión deja pasar la petición para que la seguridad conteste el 401.
 - `AuthRateLimitFilter` solo actúa en `POST /api/v1/auth/login` y `POST /api/v1/auth/register`. Por defecto deja 20 peticiones por minuto por IP y ruta. A partir de ahí responde 429 `auth.too_many_requests` con la cabecera `Retry-After: 60`. También rechaza con 429 las claves nuevas si, después de barrer las caducadas, sigue habiendo 10.000 claves (IP y ruta) vivas.
 - `JwtAuthenticationFilter` valida el `Bearer`, mete `AccessTokenClaims` en el `SecurityContext` con la autoridad `ROLE_` + rol y deja seguir. Si el token no vale, limpia el contexto y se traga la `InvalidTokenException`. Luego la regla `anyRequest().authenticated()` responde 401 con `ProblemDetailAuthenticationEntryPoint` (ADR-08). Por eso no llevar token y llevar uno caducado o inválido dan el mismo 401 `auth.required`, no `auth.invalid_token`.
 - Los errores de los filtros no pasan por `GlobalExceptionHandler`, porque los filtros corren antes del `DispatcherServlet`. El 429 y el 401 escriben el JSON a mano con `key()` y `detail()` de su `ErrorCode`.
 - `MeController`, `WalletController` y `BarController` reciben las claims con `@AuthenticationPrincipal(errorOnInvalidType = true)`. El `userId` sale del token, nunca del body. Los endpoints de `AuthController` son públicos y no reciben claims.
-- Cada excepción de negocio extiende `ApiException` y lleva uno de los 17 `ErrorCode`. `GlobalExceptionHandler` la convierte en `ProblemDetail` con un `code` estable (`wallet.insufficient_funds`). El texto lo pone el frontend (ADR-06).
+- Cada excepción de negocio extiende `ApiException` y lleva uno de los 18 `ErrorCode`. `GlobalExceptionHandler` la convierte en `ProblemDetail` con un `code` estable (`wallet.insufficient_funds`). El texto lo pone el frontend (ADR-06).
 - `GlobalExceptionHandler` extiende `ResponseEntityExceptionHandler`. Un body inválido da 400 `validation.failed` con el mapa `errors`. Al resto de errores de Spring MVC sin `code` les pone `request.rejected`. El 401 de un refresh inválido borra además la cookie `refresh_token`.
 
 ## 4. Pedir una copa

@@ -23,6 +23,7 @@ public enum ErrorCode {
     BAR_CREDIT_NOT_NEEDED("bar.credit_not_needed", HttpStatus.UNPROCESSABLE_CONTENT,
             "House credit is only for a wallet that cannot pay the cheapest drink"),
     BAR_CREDIT_USED_TODAY("bar.credit_used_today", HttpStatus.CONFLICT, "House credit already given today"),
+    BAR_TOO_MANY_REQUESTS("bar.too_many_requests", HttpStatus.TOO_MANY_REQUESTS, "Too many bar requests, try again later"),
 
     DATA_CONFLICT("data.conflict", HttpStatus.CONFLICT, "Data conflict"),
 

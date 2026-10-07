@@ -15,6 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.iulianlounge.backend.security.AuthRateLimitFilter;
+import com.iulianlounge.backend.security.BarRateLimitFilter;
 import com.iulianlounge.backend.security.JwtAuthenticationFilter;
 import com.iulianlounge.backend.security.JwtService;
 import com.iulianlounge.backend.security.ProblemDetailAuthenticationEntryPoint;
@@ -30,7 +31,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtService jwtService,
             @Value("${auth.rate-limit.max-per-minute:20}") int maxAuthAttemptsPerMinute,
+            @Value("${bar.rate-limit.max-per-minute:30}") int maxBarRequestsPerMinute,
             ObjectProvider<Clock> clock) throws Exception {
+        Clock filterClock = clock.getIfAvailable(Clock::systemUTC);
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -41,9 +44,11 @@ public class SecurityConfig {
                                 "/api/v1/auth/logout").permitAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new AuthRateLimitFilter(maxAuthAttemptsPerMinute, clock.getIfAvailable(Clock::systemUTC)),
+                .addFilterBefore(new AuthRateLimitFilter(maxAuthAttemptsPerMinute, filterClock),
                         UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new BarRateLimitFilter(maxBarRequestsPerMinute, filterClock),
+                        JwtAuthenticationFilter.class);
         return http.build();
     }
 }
