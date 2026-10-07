@@ -6,12 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -161,24 +165,31 @@ class TalkMemoryTest {
     }
 
     @Test
-    void twoConcurrentPairsNeverBreakTheAlternationOfTheWindow() throws Exception {
+    void concurrentPairsThatFitInTheWindowAreAllKept() throws Exception {
+        int writers = TalkMemory.MAX_TURNS / 2;
         for (int round = 0; round < 200; round++) {
             UUID member = UUID.randomUUID();
-            CountDownLatch go = new CountDownLatch(1);
-            ExecutorService pool = Executors.newFixedThreadPool(8);
-            for (int writer = 0; writer < 8; writer++) {
-                int id = writer;
-                pool.submit(() -> {
-                    go.await();
-                    memory.remember(member, "u" + id, "a" + id);
-                    return null;
-                });
-            }
-            go.countDown();
-            pool.shutdown();
-            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
 
-            assertAlternating(memory.recent(member));
+            rememberConcurrently(member, writers);
+
+            List<LlmTurn> window = memory.recent(member);
+            assertEquals(TalkMemory.MAX_TURNS, window.size());
+            assertAlternating(window);
+            assertEquals(Set.of("u0", "u1", "u2"), userTexts(window));
+        }
+    }
+
+    @Test
+    void moreConcurrentPairsThanTheWindowHoldsLeaveItFullAndAlternating() throws Exception {
+        for (int round = 0; round < 200; round++) {
+            UUID member = UUID.randomUUID();
+
+            rememberConcurrently(member, 8);
+
+            List<LlmTurn> window = memory.recent(member);
+            assertEquals(TalkMemory.MAX_TURNS, window.size());
+            assertAlternating(window);
+            assertEquals(TalkMemory.MAX_TURNS / 2, userTexts(window).size());
         }
     }
 
@@ -190,6 +201,35 @@ class TalkMemoryTest {
         assertThrows(UnsupportedOperationException.class, () -> window.add(user("intruso")));
 
         assertEquals(2, memory.recent(MEMBER).size());
+    }
+
+    private void rememberConcurrently(UUID member, int writers) throws Exception {
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(writers);
+        try {
+            List<Future<Void>> pending = new ArrayList<>();
+            for (int writer = 0; writer < writers; writer++) {
+                int id = writer;
+                pending.add(pool.submit(() -> {
+                    go.await();
+                    memory.remember(member, "u" + id, "a" + id);
+                    return null;
+                }));
+            }
+            go.countDown();
+            for (Future<Void> task : pending) {
+                task.get(10, TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static Set<String> userTexts(List<LlmTurn> window) {
+        return window.stream()
+                .filter(turn -> turn.role() == LlmTurn.Role.USER)
+                .map(LlmTurn::text)
+                .collect(Collectors.toSet());
     }
 
     private static void assertAlternating(List<LlmTurn> window) {
