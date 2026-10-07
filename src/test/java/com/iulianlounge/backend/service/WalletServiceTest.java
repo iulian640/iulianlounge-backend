@@ -159,12 +159,20 @@ class WalletServiceTest {
                 () -> walletService.debit(USER_ID, 30, TransactionType.WELCOME_BONUS, "clave-1"));
     }
 
-    @Test
-    void creditRefusesToJoinSomeoneElsesTransaction() {
+    @ParameterizedTest
+    @ValueSource(strings = {"credit", "creditIf", "debit"})
+    void movingChipsRefusesToJoinSomeoneElsesTransaction(String operation) {
         TransactionSynchronizationManager.setActualTransactionActive(true);
         try {
-            assertThrows(IllegalStateException.class,
-                    () -> walletService.credit(USER_ID, 10, TransactionType.WELCOME_BONUS, null));
+            IllegalStateException refused = assertThrows(IllegalStateException.class, () -> {
+                switch (operation) {
+                    case "credit" -> walletService.credit(USER_ID, 10, TransactionType.WELCOME_BONUS, null);
+                    case "creditIf" -> walletService.creditIf(USER_ID, 10, TransactionType.HOUSE_CREDIT, "dia-1",
+                            balance -> true);
+                    default -> walletService.debit(USER_ID, 10, TransactionType.BAR_ORDER, null);
+                }
+            });
+            assertTrue(refused.getMessage().contains(operation), refused.getMessage());
         } finally {
             TransactionSynchronizationManager.setActualTransactionActive(false);
         }

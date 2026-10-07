@@ -151,7 +151,7 @@ public class WalletService {
 
     private static void requireOwnTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("WalletService.credit/debit must run in its own transaction");
+            throw new IllegalStateException("WalletService.credit, creditIf and debit must run in their own transaction");
         }
     }
 
