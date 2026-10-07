@@ -8,7 +8,8 @@ public enum BarmanSituation {
     PROMOTION(true),
     BROKE(true),
     NO_CREDIT(false),
-    HOUSE_CREDIT(false);
+    HOUSE_CREDIT(false),
+    BUSY(false);
 
     private final boolean byRank;
 

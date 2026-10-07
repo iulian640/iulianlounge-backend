@@ -16,11 +16,12 @@ import com.iulianlounge.backend.dto.BarResponse;
 import com.iulianlounge.backend.dto.DrinkResponse;
 import com.iulianlounge.backend.dto.HouseCreditResponse;
 import com.iulianlounge.backend.dto.OrderResponse;
+import com.iulianlounge.backend.dto.TalkFacts;
 import com.iulianlounge.backend.exception.HouseCreditNotNeededException;
 import com.iulianlounge.backend.exception.HouseCreditUsedTodayException;
 
 @Service
-public class BarService {
+public class BarService implements BarFacts {
 
     public static final long HOUSE_CREDIT_AMOUNT = 50;
 
@@ -69,6 +70,14 @@ public class BarService {
         Rank rank = rankOf(userId);
         return new HouseCreditResponse(HOUSE_CREDIT_AMOUNT, movement.getBalanceAfter(), rank,
                 BarmanSituation.HOUSE_CREDIT.lineFor(rank));
+    }
+
+    @Override
+    public TalkFacts factsFor(UUID userId) {
+        long balance = walletService.getBalance(userId);
+        long spent = walletService.spentOn(userId, TransactionType.BAR_ORDER);
+        return new TalkFacts(DrinkResponse.menu(), balance, Rank.forSpent(spent), spent,
+                creditAvailable(userId, balance));
     }
 
     public Rank rankOf(UUID userId) {

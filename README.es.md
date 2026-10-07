@@ -38,6 +38,12 @@ docker compose up -d        # PostgreSQL en localhost:5432
 `JWT_SECRET` tiene que ser base64 de 32 bytes o más. Con otra cosa la app no
 arranca, a propósito.
 
+`ANTHROPIC_API_KEY` es opcional. Sin ella el barman no sale a la red y contesta
+siempre con la frase fija del catálogo (`FALLBACK`). Con ella,
+`POST /api/v1/bar/talk` va a Claude Haiku. Los tests nunca la ven. El
+razonamiento está en la enmienda del 2026-10-07 de
+[ADR-05](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.md).
+
 Para los tests: `./mvnw verify`. Los de repositorio van contra el Postgres de
 la compose, así que tiene que estar levantado.
 
@@ -175,7 +181,7 @@ y se expanden cuando se implementan.
 | ADR | ES | EN |
 |---|---|---|
 | 04: ledger append-only + saldo materializado | [ES](docs/adr/ADR-04-ledger-append-only-saldo-materializado.md) | [EN](docs/adr/ADR-04-ledger-append-only-saldo-materializado.en.md) |
-| 05: barman LLM, function calling en lista blanca | [ES](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.md) | [EN](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md) |
+| 05: barman LLM (sin function calling desde la enmienda del 2026-10-07) | [ES](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.md) | [EN](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md) |
 | 06: i18n, claves en backend y textos en frontend | [ES](docs/adr/ADR-06-i18n-claves-backend-textos-frontend.md) | [EN](docs/adr/ADR-06-i18n-claves-backend-textos-frontend.en.md) |
 | 08: JWT stateless con refresh token | [ES](docs/adr/ADR-08-jwt-stateless-con-refresh-token.md) | [EN](docs/adr/ADR-08-jwt-stateless-con-refresh-token.en.md) |
 | 09: fichas como enteros, prohibido double | [ES](docs/adr/ADR-09-fichas-enteros-long-prohibido-double.md) | [EN](docs/adr/ADR-09-fichas-enteros-long-prohibido-double.en.md) |

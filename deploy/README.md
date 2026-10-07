@@ -64,6 +64,36 @@ docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --
 El frontend se construye desde su repo en GitHub, en la rama de `FRONTEND_REF`
 (`main` por defecto): lo que se despliega es lo que está en esa rama.
 
+## El barman con LLM (clave opcional)
+
+`POST /api/v1/bar/talk` lleva el texto libre del socio a Claude Haiku. Sin
+`ANTHROPIC_API_KEY` en `deploy/.env` la app arranca igual: el LLM queda apagado
+y el barman contesta siempre con el respaldo (`source: FALLBACK`, clave
+`barman.busy`). Con la variable vacía, que es como viene de `.env.example`, pasa
+lo mismo.
+
+- La clave se escribe a mano en `deploy/.env` del servidor, nunca en git ni en
+  un comando que la imprima. La compose la pasa al contenedor como
+  `ANTHROPIC_API_KEY` y, si falta, la deja vacía.
+- El backend necesita salida HTTPS (443) a `api.anthropic.com`. Si no la hay, el
+  barman cae al respaldo sin romper nada.
+- El techo de gasto mensual (5 $) se pone en la Console de Anthropic, no aquí. En
+  la app, el techo es de 0,50 $ al día, más 30 mensajes por socio y día, 60 por
+  IP y día, 10 por minuto y socio, y 8 llamadas a la vez.
+- Los contadores y la memoria de la charla viven en RAM: un despliegue los
+  reinicia. Sirve de reinicio de emergencia si el tope del día se agota.
+- Caddy corta con un 413 los cuerpos de más de 16 KB en `/api/*`, antes de que
+  lleguen a Spring.
+
+Comprobar sin enseñar la clave:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec backend sh -c 'test -n "$ANTHROPIC_API_KEY" && echo set || echo empty'
+docker compose -f deploy/docker-compose.prod.yml logs backend | grep "Barman LLM"
+head -c 1048576 /dev/zero > /tmp/grande.json
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' --data-binary @/tmp/grande.json https://iulianlounge.com/api/v1/bar/talk    # 413
+```
+
 ## BD de desarrollo creada antes del 25-sep
 
 La V2 se renombró (errata `insesnsitive`). Una BD local que ya la tenía aplicada
@@ -79,6 +109,8 @@ docker exec lounge-db psql -U postgres -d iulianlounge -c \
 - No añadir `ports` a `postgres` ni a `backend`: Docker se salta `ufw`, y el
   puerto quedaría abierto a internet.
 - No cambiar `JWT_SECRET` salvo que se haya filtrado: cierra todas las sesiones.
+- No ejecutar `docker compose config` ni imprimir `deploy/.env`: sacarían
+  `ANTHROPIC_API_KEY` y el resto de secretos a la terminal.
 - No borrar el volumen `iulianlounge_pgdata`: es la base de datos. El script
   de `postgres-init/` solo corre con el volumen vacío.
 - No usar `docker compose -p deploy ...` en este servidor: `deploy` era el

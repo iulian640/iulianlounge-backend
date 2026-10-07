@@ -33,6 +33,7 @@ import com.iulianlounge.backend.domain.TransactionType;
 import com.iulianlounge.backend.dto.BarResponse;
 import com.iulianlounge.backend.dto.HouseCreditResponse;
 import com.iulianlounge.backend.dto.OrderResponse;
+import com.iulianlounge.backend.dto.TalkFacts;
 import com.iulianlounge.backend.exception.HouseCreditNotNeededException;
 import com.iulianlounge.backend.exception.HouseCreditUsedTodayException;
 import com.iulianlounge.backend.exception.InsufficientFundsException;
@@ -240,6 +241,34 @@ class BarServiceTest {
         when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(300L);
 
         assertEquals(Rank.SOCIO, barService.rankOf(USER_ID));
+    }
+
+    @Test
+    void theBarmanFactsAreTheMenuPlusWhatWasSpent() {
+        when(walletService.getBalance(USER_ID)).thenReturn(3L);
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(97L);
+        when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
+
+        BarResponse bar = barService.menu(USER_ID);
+        TalkFacts facts = barService.factsFor(USER_ID);
+
+        assertEquals(bar.drinks(), facts.drinks());
+        assertEquals(bar.balance(), facts.balance());
+        assertEquals(bar.rank(), facts.rank());
+        assertEquals(bar.creditAvailable(), facts.creditAvailable());
+        assertEquals(97, facts.spent());
+    }
+
+    @Test
+    void theBarmanFactsNeverMoveChips() {
+        when(walletService.getBalance(USER_ID)).thenReturn(60L);
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(40L);
+
+        TalkFacts facts = barService.factsFor(USER_ID);
+
+        assertFalse(facts.creditAvailable());
+        verify(walletService, never()).debit(any(), anyLong(), any(), any());
+        verify(walletService, never()).creditIf(any(), anyLong(), any(), any(), any());
     }
 
     @Test

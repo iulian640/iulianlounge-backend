@@ -4,7 +4,7 @@
 
 ## Status
 
-Accepted — 2026-07-03. Amended on 2026-09-23 (see History). The `code`
+Accepted — 2026-07-03. Amended on 2026-09-23 and 2026-10-07 (see History). The `code`
 field, the `ErrorCode` enum and the validation keys
 (`validation.<constraint>`, e.g. `validation.not_blank`) were implemented on
 2026-09-25. Errors raised by Spring itself (malformed JSON, 405...) carry
@@ -70,11 +70,15 @@ This is the only exception to the rule, and it is bounded:
 - If the reply comes from the **catalog** of lines (rule-based fallback), the
   backend sends a key and the frontend looks the line up in its dictionary.
 - If it comes from the **LLM**, the backend sends the text as is, already
-  generated in the user's language thanks to `User.locale` in the system
-  prompt.
+  generated in the user's language (the request's `locale` or, if it does not
+  arrive, `User.locale`, in the system prompt).
 
-The reply's `source` field (`"llm"` or `"catalogo"`) tells the frontend what
-to do with it.
+The reply's `source` field (`LLM` or `FALLBACK`, the `TalkSource` enum) tells
+the frontend what to do with it. With `LLM` the text arrives in `text`; with
+`FALLBACK` the catalog key arrives in `line` (`barman.busy`) and `text` is
+`null`. Exactly one of the two always arrives. The contract in detail is in
+the 2026-10-07 amendment of
+[ADR-05](ADR-05-barman-llm-function-calling-lista-blanca.en.md).
 
 ## Alternatives considered
 
@@ -116,3 +120,6 @@ to do with it.
   The format is pinned down (`code` + English `detail` + per-field `errors`),
   codes are centralized in `ErrorCode`, and the LLM-generated text exception
   is documented.
+- 2026-10-07: the `source` field changes from `"llm"`/`"catalogo"` to the
+  `TalkSource` enum values (`LLM`/`FALLBACK`), and the response carries `text`
+  or `line` as the case may be (amendment of ADR-05).

@@ -476,7 +476,8 @@ Base: `/api/v1`. Auth = JWT Bearer unless stated. Standard pagination: `?page=&s
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/bartender/conversation` | Last N messages, paginated backwards |
-| POST | `/bartender/messages` | {text} → {reply}. Rate limit: 10/min (LLM cost). Timeout with rule-based fallback |
+| POST | `/bar/talk` | {text, locale?} → {source, text, line}. **Implemented (IUL-44).** Replaces `/bartender/messages`. `source` is `LLM` (with `text`) or `FALLBACK` (with `line: "barman.busy"`); always 200 except validation (400), no token (401) or more than 10/min (429 + `Retry-After: 60`, without touching the drink-ordering quota). Text of at most 280 characters and 560 bytes; the member comes from the token. No tools, nothing persisted (ADR-05, 7 Oct amendment) |
+| ~~POST~~ | ~~`/bartender/messages`~~ | Superseded by `/bar/talk` |
 | POST | `/bartender/loans` | {idempotencyKey} → loan if broke and no active debt; amount set by the **server** |
 | POST | `/bartender/loans/{id}/repayments` | {amount} → {outstanding} |
 
@@ -507,7 +508,7 @@ Expanded as of 2026-07-14: [ADR-04](adr/ADR-04-ledger-append-only-saldo-material
 
 **ADR-04 — Append-only ledger + materialized balance with optimistic locking (accepted).** `TokenTransaction` is the auditable truth; `Wallet.balance` is the materialized view updated in the same transaction, protected with `@Version` and retry (1 retry, then 409). Fully derived balance (SUM over the ledger) rejected: every bet would scan the history. Pessimistic locking (`SELECT FOR UPDATE`) rejected as the default: with one user per wallet the real contention is their own double click, which the idempotencyKey solves; optimistic teaches more and scales better.
 
-**ADR-05 — Bartender: LLM via backend with allowlisted function calling and rule-based fallback (accepted).** Single provider (Claude API) behind the `LlmClient` interface; key in an environment variable, never in the client. Tools are **read-only** (balance, progress, debt, streak); no LLM tool moves tokens — the loan is a separate endpoint with server rules (see risk R5). Fallback: if the LLM fails or times out (8 s), template replies with the same data ("The bar doesn't lend to strangers, kid… and I'm slow today"). Alternatives: local LLM (unviable in a bootcamp deployment), multi-provider router (YAGNI).
+**ADR-05 — Bartender: LLM via backend with allowlisted function calling and rule-based fallback (accepted).** Single provider (Claude API) behind the `LlmClient` interface; key in an environment variable, never in the client. Tools are **read-only** (balance, progress, debt, streak); no LLM tool moves tokens — the loan is a separate endpoint with server rules (see risk R5). Fallback: if the LLM fails or times out (8 s), template replies with the same data ("The bar doesn't lend to strangers, kid… and I'm slow today"). Alternatives: local LLM (unviable in a bootcamp deployment), multi-provider router (YAGNI). **Amended on 2026-10-07:** in the MVP the bartender talks in free text with Claude Haiku 4.5 and **without function calling**: the member's data goes in the system prompt through `BarFacts` (a read-only interface), with a 6-turn memory in RAM (15 min), caps per minute, per member per day, per IP per day, $0.50 global per day and 8 simultaneous calls, and a fallback that is always a 200 (`FALLBACK`, `barman.busy`). Details in [ADR-05](adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md).
 
 **ADR-06 — i18n: keys in the backend, texts in the frontend with vue-i18n (accepted).** The backend returns keys (`item.jacket.name`, error codes) and the frontend resolves ES/EN with vue-i18n; `User.locale` is used only for the bartender's language (injected into the system prompt) and future emails. Rejected alternative: localized texts from the backend (duplicates catalogs, complicates caching and couples the two repos' deploys).
 
@@ -533,7 +534,7 @@ Expanded as of 2026-07-14: [ADR-04](adr/ADR-04-ledger-append-only-saldo-material
 
 **R6 — Growth of the ledger and the bartender's history.** With the incremental, the temptation is to write one transaction per tick: within weeks, millions of rows. Mitigation: the incremental only writes to the ledger on **collection** (one row), and the bartender's conversation is sent to the LLM with a sliding window (last N messages), not whole — which also controls token cost.
 
-**R7 — LLM cost and latency.** Without a rate limit, a bored user (or a loop) burns the API quota. Mitigation: per-user rate limit on `/bartender/messages`, timeout with rule-based fallback (ADR-05), a maximum daily budget configured at the provider, and token-consumption logging per conversation.
+**R7 — LLM cost and latency.** Without a rate limit, a bored user (or a loop) burns the API quota. Mitigation: per-user rate limit on `/bar/talk`, timeout with rule-based fallback (ADR-05), a maximum daily budget configured at the provider, and token-consumption logging per conversation.
 
 **R8 — CORS and deployment across two repos.** With frontend and backend on different origins, the first real contact with CORS tends to happen on a Friday afternoon. Configure explicit CORS per profile (the Vite dev server origin in dev, the real domain in prod), never `*` with credentials.
 

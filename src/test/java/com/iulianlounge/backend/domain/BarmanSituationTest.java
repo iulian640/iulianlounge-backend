@@ -14,7 +14,9 @@ class BarmanSituationTest {
         "PROMOTION, CONFIANZA, barman.promotion.confianza",
         "BROKE, SOCIO, barman.broke.socio",
         "NO_CREDIT, HABITUAL, barman.no_credit",
-        "HOUSE_CREDIT, SOCIO, barman.house_credit"
+        "HOUSE_CREDIT, SOCIO, barman.house_credit",
+        "BUSY, NADIE, barman.busy",
+        "BUSY, SOCIO, barman.busy"
     })
     void theLineKeyNamesTheSituationAndTheRankWhenItDependsOnIt(BarmanSituation situation, Rank rank,
             String key) {

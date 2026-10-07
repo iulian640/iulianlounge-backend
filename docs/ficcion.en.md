@@ -70,6 +70,15 @@ notice it in how the bartender treats you.
 
 ## The bartender (character sheet)
 
+> **SUPERSEDED on 2026-10-07 (amendment of [ADR-05](adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md)).**
+> The "openly rude" voice and the rudeness calibration of this sheet no
+> longer apply. In the MVP the bartender is a "regular bartender with a bit
+> of wit" who neither insults nor mocks anyone, has no name in either
+> language and uses no period slang. The prompt source is now
+> `src/main/resources/barman/system-prompt.txt`. The age, the past and the
+> rule that he never lies about numbers stay. The catalog of lines below
+> remains valid for game-event reactions.
+
 - **Name — UPDATED (2026-07-12, formerly «Cursaito»):** in ES he has no
   name: he is simply **el Barman**. Ask what he is called and he changes
   the subject — same as when you ask about Iulian. In EN, **Dwight**.

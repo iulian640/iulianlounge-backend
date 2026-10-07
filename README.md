@@ -38,6 +38,12 @@ docker compose up -d        # PostgreSQL on localhost:5432
 `JWT_SECRET` must be base64 and decode to 32 bytes or more. Anything else stops
 the app from starting, on purpose.
 
+`ANTHROPIC_API_KEY` is optional. Without it the bartender never calls the
+network and always answers with the fixed catalog line (`FALLBACK`). With it,
+`POST /api/v1/bar/talk` goes to Claude Haiku. The tests never see it. The
+reasoning is in the 2026-10-07 amendment of
+[ADR-05](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md).
+
 To run the tests: `./mvnw verify`. The repository tests hit the compose
 Postgres, so it has to be up.
 
@@ -198,7 +204,7 @@ and get their own file when they're implemented.
 | ADR | ES | EN |
 |---|---|---|
 | 04: append-only ledger + materialised balance | [ES](docs/adr/ADR-04-ledger-append-only-saldo-materializado.md) | [EN](docs/adr/ADR-04-ledger-append-only-saldo-materializado.en.md) |
-| 05: LLM bartender, allow-listed function calling | [ES](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.md) | [EN](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md) |
+| 05: LLM bartender (function calling dropped in the 2026-10-07 amendment) | [ES](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.md) | [EN](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md) |
 | 06: i18n, keys in the backend and texts in the frontend | [ES](docs/adr/ADR-06-i18n-claves-backend-textos-frontend.md) | [EN](docs/adr/ADR-06-i18n-claves-backend-textos-frontend.en.md) |
 | 08: stateless JWT with refresh token | [ES](docs/adr/ADR-08-jwt-stateless-con-refresh-token.md) | [EN](docs/adr/ADR-08-jwt-stateless-con-refresh-token.en.md) |
 | 09: chips as integers, no double | [ES](docs/adr/ADR-09-fichas-enteros-long-prohibido-double.md) | [EN](docs/adr/ADR-09-fichas-enteros-long-prohibido-double.en.md) |
