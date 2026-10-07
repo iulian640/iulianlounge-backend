@@ -10,13 +10,19 @@ import org.springframework.stereotype.Service;
 import com.iulianlounge.backend.domain.BarmanSituation;
 import com.iulianlounge.backend.domain.Drink;
 import com.iulianlounge.backend.domain.Rank;
+import com.iulianlounge.backend.domain.TokenTransaction;
 import com.iulianlounge.backend.domain.TransactionType;
 import com.iulianlounge.backend.dto.BarResponse;
 import com.iulianlounge.backend.dto.DrinkResponse;
+import com.iulianlounge.backend.dto.HouseCreditResponse;
 import com.iulianlounge.backend.dto.OrderResponse;
+import com.iulianlounge.backend.exception.HouseCreditNotNeededException;
+import com.iulianlounge.backend.exception.HouseCreditUsedTodayException;
 
 @Service
 public class BarService {
+
+    public static final long HOUSE_CREDIT = 50;
 
     static final ZoneId CLUB_ZONE = ZoneId.of("Europe/Madrid");
 
@@ -46,6 +52,20 @@ public class BarService {
         BarmanSituation situation = orderSituation(promoted, balance, creditAvailable);
         return new OrderResponse(drink, drink.price(), balance, after, promoted, creditAvailable,
                 situation.lineFor(after));
+    }
+
+    public HouseCreditResponse houseCredit(UUID userId) {
+        if (!isBroke(walletService.getBalance(userId))) {
+            throw new HouseCreditNotNeededException();
+        }
+        String key = houseCreditKey();
+        if (walletService.hasMovement(userId, key)) {
+            throw new HouseCreditUsedTodayException();
+        }
+        TokenTransaction credit = walletService.credit(userId, HOUSE_CREDIT, TransactionType.HOUSE_CREDIT, key);
+        Rank rank = rankOf(userId);
+        return new HouseCreditResponse(HOUSE_CREDIT, credit.getBalanceAfter(), rank,
+                BarmanSituation.HOUSE_CREDIT.lineFor(rank));
     }
 
     public Rank rankOf(UUID userId) {

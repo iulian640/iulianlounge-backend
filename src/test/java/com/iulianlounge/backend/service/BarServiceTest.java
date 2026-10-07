@@ -4,7 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,9 +24,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.iulianlounge.backend.domain.Drink;
 import com.iulianlounge.backend.domain.Rank;
+import com.iulianlounge.backend.domain.TokenTransaction;
 import com.iulianlounge.backend.domain.TransactionType;
 import com.iulianlounge.backend.dto.BarResponse;
+import com.iulianlounge.backend.dto.HouseCreditResponse;
 import com.iulianlounge.backend.dto.OrderResponse;
+import com.iulianlounge.backend.exception.HouseCreditNotNeededException;
+import com.iulianlounge.backend.exception.HouseCreditUsedTodayException;
 import com.iulianlounge.backend.exception.InsufficientFundsException;
 
 @ExtendWith(MockitoExtension.class)
@@ -144,6 +151,40 @@ class BarServiceTest {
                 .when(walletService).debit(USER_ID, 40, TransactionType.BAR_ORDER, "order:" + key);
 
         assertThrows(InsufficientFundsException.class, () -> barService.order(USER_ID, Drink.FRENCH_75, key));
+    }
+
+    @Test
+    void theHouseLendsFiftyChipsUnderTodaysKey() {
+        when(walletService.getBalance(USER_ID)).thenReturn(3L);
+        when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(false);
+        when(walletService.credit(USER_ID, BarService.HOUSE_CREDIT, TransactionType.HOUSE_CREDIT, TODAYS_CREDIT))
+                .thenReturn(new TokenTransaction(UUID.randomUUID(), 50, TransactionType.HOUSE_CREDIT, 53,
+                        TODAYS_CREDIT, NIGHT_IN_MADRID));
+        when(walletService.spentOn(USER_ID, TransactionType.BAR_ORDER)).thenReturn(97L);
+
+        HouseCreditResponse credit = barService.houseCredit(USER_ID);
+
+        assertEquals(50, credit.amount());
+        assertEquals(53, credit.balance());
+        assertEquals(Rank.HABITUAL, credit.rank());
+        assertEquals("barman.house_credit", credit.line());
+    }
+
+    @Test
+    void theHouseDoesNotLendToWhoeverCanStillPay() {
+        when(walletService.getBalance(USER_ID)).thenReturn(5L);
+
+        assertThrows(HouseCreditNotNeededException.class, () -> barService.houseCredit(USER_ID));
+        verify(walletService, never()).credit(any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void theHouseLendsOncePerClubDay() {
+        when(walletService.getBalance(USER_ID)).thenReturn(0L);
+        when(walletService.hasMovement(USER_ID, TODAYS_CREDIT)).thenReturn(true);
+
+        assertThrows(HouseCreditUsedTodayException.class, () -> barService.houseCredit(USER_ID));
+        verify(walletService, never()).credit(any(), anyLong(), any(), any());
     }
 
     @Test

@@ -28,7 +28,10 @@ import com.iulianlounge.backend.domain.Role;
 import com.iulianlounge.backend.domain.User;
 import com.iulianlounge.backend.dto.BarResponse;
 import com.iulianlounge.backend.dto.DrinkResponse;
+import com.iulianlounge.backend.dto.HouseCreditResponse;
 import com.iulianlounge.backend.dto.OrderResponse;
+import com.iulianlounge.backend.exception.HouseCreditNotNeededException;
+import com.iulianlounge.backend.exception.HouseCreditUsedTodayException;
 import com.iulianlounge.backend.exception.InsufficientFundsException;
 import com.iulianlounge.backend.security.JwtService;
 import com.iulianlounge.backend.service.BarService;
@@ -150,6 +153,37 @@ class BarControllerTest {
                         """))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("wallet.insufficient_funds"));
+    }
+
+    @Test
+    void theHouseCreditGoesToTheTokenOwner() throws Exception {
+        when(barService.houseCredit(user.getId()))
+                .thenReturn(new HouseCreditResponse(50, 50, Rank.NADIE, "barman.house_credit"));
+
+        mockMvc.perform(post("/api/v1/bar/house-credit").header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.amount").value(50))
+                .andExpect(jsonPath("$.balance").value(50))
+                .andExpect(jsonPath("$.rank").value("NADIE"))
+                .andExpect(jsonPath("$.line").value("barman.house_credit"));
+    }
+
+    @Test
+    void theHouseCreditWithChipsLeftIs422() throws Exception {
+        when(barService.houseCredit(user.getId())).thenThrow(new HouseCreditNotNeededException());
+
+        mockMvc.perform(post("/api/v1/bar/house-credit").header("Authorization", bearer))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("bar.credit_not_needed"));
+    }
+
+    @Test
+    void theHouseCreditTwiceInADayIs409() throws Exception {
+        when(barService.houseCredit(user.getId())).thenThrow(new HouseCreditUsedTodayException());
+
+        mockMvc.perform(post("/api/v1/bar/house-credit").header("Authorization", bearer))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("bar.credit_used_today"));
     }
 
     private RequestBuilder order(String idempotencyKey, String body) {

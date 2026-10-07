@@ -20,6 +20,10 @@ public enum ErrorCode {
     WALLET_IDEMPOTENCY_MISMATCH("wallet.idempotency_mismatch", HttpStatus.CONFLICT,
             "Idempotency key already used for a different movement"),
 
+    BAR_CREDIT_NOT_NEEDED("bar.credit_not_needed", HttpStatus.UNPROCESSABLE_CONTENT,
+            "House credit is only for a wallet that cannot pay the cheapest drink"),
+    BAR_CREDIT_USED_TODAY("bar.credit_used_today", HttpStatus.CONFLICT, "House credit already given today"),
+
     DATA_CONFLICT("data.conflict", HttpStatus.CONFLICT, "Data conflict"),
 
     VALIDATION_FAILED("validation.failed", HttpStatus.BAD_REQUEST, "Request validation failed"),

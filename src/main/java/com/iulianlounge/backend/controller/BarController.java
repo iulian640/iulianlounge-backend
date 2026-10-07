@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.validation.Valid;
 
 import com.iulianlounge.backend.dto.BarResponse;
+import com.iulianlounge.backend.dto.HouseCreditResponse;
 import com.iulianlounge.backend.dto.OrderRequest;
 import com.iulianlounge.backend.dto.OrderResponse;
 import com.iulianlounge.backend.security.AccessTokenClaims;
@@ -38,5 +39,11 @@ public class BarController {
             @RequestHeader("Idempotency-Key") UUID idempotencyKey,
             @Valid @RequestBody OrderRequest request) {
         return barService.order(claims.userId(), request.drink(), idempotencyKey);
+    }
+
+    @PostMapping("/house-credit")
+    public HouseCreditResponse houseCredit(
+            @AuthenticationPrincipal(errorOnInvalidType = true) AccessTokenClaims claims) {
+        return barService.houseCredit(claims.userId());
     }
 }
