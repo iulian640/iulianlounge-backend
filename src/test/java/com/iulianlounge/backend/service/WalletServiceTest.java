@@ -245,6 +245,11 @@ class WalletServiceTest {
     }
 
     @Test
+    void hasMovementNeedsAKeyBecauseTheWelcomeBonusHasNone() {
+        assertThrows(NullPointerException.class, () -> walletService.hasMovement(USER_ID, null));
+    }
+
+    @Test
     void hasMovementIsFalseForAUserWithoutWallet() {
         when(walletRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
 

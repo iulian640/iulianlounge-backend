@@ -1,6 +1,7 @@
 package com.iulianlounge.backend.service;
 
 import java.time.Clock;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -70,6 +71,7 @@ public class WalletService {
     }
 
     public boolean hasMovement(UUID userId, String idempotencyKey) {
+        Objects.requireNonNull(idempotencyKey, "idempotencyKey");
         return walletRepository.findByUserId(userId)
                 .flatMap(wallet -> transactionRepository.findByWalletIdAndIdempotencyKey(wallet.getId(), idempotencyKey))
                 .isPresent();
