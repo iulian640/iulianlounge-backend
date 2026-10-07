@@ -179,6 +179,26 @@ class WalletRepositoryTest {
     }
 
     @Test
+    void listsTheMovementsOfOneTypeInOneWalletOldestFirst() {
+        Wallet other = walletRepository.saveAndFlush(new Wallet(newUser("dwight").getId(), NOW));
+        transactionRepository.saveAndFlush(movement(wallet, 100, TransactionType.WELCOME_BONUS, 100));
+        transactionRepository.saveAndFlush(new TokenTransaction(wallet.getId(), -20, TransactionType.BLACKJACK_BET, 80,
+                "blackjack-bet:second", NOW.plusSeconds(10)));
+        transactionRepository.saveAndFlush(new TokenTransaction(wallet.getId(), -10, TransactionType.BLACKJACK_BET, 90,
+                "blackjack-bet:first", NOW));
+        transactionRepository.saveAndFlush(movement(wallet, -5, TransactionType.BAR_ORDER, 75));
+        transactionRepository.saveAndFlush(new TokenTransaction(other.getId(), -50, TransactionType.BLACKJACK_BET, 50,
+                "blackjack-bet:other", NOW));
+        entityManager.clear();
+
+        List<TokenTransaction> bets = transactionRepository.findByWalletIdAndTypeOrderByCreatedAtAscIdAsc(
+                wallet.getId(), TransactionType.BLACKJACK_BET);
+
+        assertEquals(List.of("blackjack-bet:first", "blackjack-bet:second"),
+                bets.stream().map(TokenTransaction::getIdempotencyKey).toList());
+    }
+
+    @Test
     void theSumIsZeroWithoutMovementsOfThatType() {
         transactionRepository.saveAndFlush(movement(wallet, 100, TransactionType.WELCOME_BONUS, 100));
 

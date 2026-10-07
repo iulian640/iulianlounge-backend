@@ -1,6 +1,7 @@
 package com.iulianlounge.backend.service;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,6 +88,12 @@ public class WalletService {
         return walletRepository.findByUserId(userId)
                 .map(wallet -> -transactionRepository.sumAmountByWalletIdAndType(wallet.getId(), type))
                 .orElse(0L);
+    }
+
+    public List<TokenTransaction> movementsOf(UUID userId, TransactionType type) {
+        return walletRepository.findByUserId(userId)
+                .map(wallet -> transactionRepository.findByWalletIdAndTypeOrderByCreatedAtAscIdAsc(wallet.getId(), type))
+                .orElse(List.of());
     }
 
     public boolean hasMovement(UUID userId, String idempotencyKey) {
