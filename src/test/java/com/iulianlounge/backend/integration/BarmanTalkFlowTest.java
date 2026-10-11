@@ -72,7 +72,7 @@ class BarmanTalkFlowTest {
         verify(llmClient).reply(prompt.capture(), turns.capture());
         assertFalse(prompt.getValue().contains(member.username()), prompt.getValue());
         assertFalse(prompt.getValue().contains(member.userId()), prompt.getValue());
-        assertTrue(prompt.getValue().contains("- Saldo: 100 chikilicuatres."), prompt.getValue());
+        assertTrue(prompt.getValue().contains("- Saldo: 100 monedas."), prompt.getValue());
         assertTrue(prompt.getValue().contains("- Responde en español de España,"), prompt.getValue());
         assertEquals(List.of(new LlmTurn(LlmTurn.Role.USER, "hola")), turns.getValue());
     }

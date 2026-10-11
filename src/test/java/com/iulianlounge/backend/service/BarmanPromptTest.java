@@ -77,7 +77,7 @@ class BarmanPromptTest {
     void theMenuListsEveryDrinkWithItsPrice() {
         String text = prompt.build(facts(Rank.NADIE, 0, 100, false), Language.ES);
 
-        assertTrue(text.contains("- Carta (precio en chikilicuatres): Bathtub Gin 5, Bee's Knees 10, Gin Rickey 15, "
+        assertTrue(text.contains("- Carta (precio en monedas): Bathtub Gin 5, Bee's Knees 10, Gin Rickey 15, "
                 + "Sidecar 25, French 75 40."), text);
     }
 
@@ -85,7 +85,7 @@ class BarmanPromptTest {
     void theMenuIsPricedInTheCurrencyOfTheMemberLanguage() {
         String text = prompt.build(facts(Rank.NADIE, 0, 100, false), Language.EN);
 
-        assertTrue(text.contains("- Carta (precio en Shrutebucks): Bathtub Gin 5, Bee's Knees 10, Gin Rickey 15, "
+        assertTrue(text.contains("- Carta (precio en coins): Bathtub Gin 5, Bee's Knees 10, Gin Rickey 15, "
                 + "Sidecar 25, French 75 40."), text);
     }
 
@@ -93,14 +93,14 @@ class BarmanPromptTest {
     void aMemberOnTheWayUpIsToldWhatIsMissingForTheNextRank() {
         String text = prompt.build(facts(Rank.HABITUAL, 25, 60, false), Language.ES);
 
-        assertTrue(text.contains("- Lleva gastados 25 chikilicuatres. Le faltan 75 para Habitual."), text);
+        assertTrue(text.contains("- Lleva gastados 25 monedas. Le faltan 75 para Habitual."), text);
     }
 
     @Test
     void aMemberOnTheWayUpIsToldWhatIsMissingInEnglishToo() {
         String text = prompt.build(facts(Rank.HABITUAL, 25, 60, false), Language.EN);
 
-        assertTrue(text.contains("- Lleva gastados 25 Shrutebucks. They need 75 more for Regular."), text);
+        assertTrue(text.contains("- Lleva gastados 25 coins. They need 75 more for Regular."), text);
     }
 
     @Test
@@ -108,15 +108,15 @@ class BarmanPromptTest {
         String spanish = prompt.build(facts(Rank.SOCIO, 340, 60, false), Language.ES);
         String english = prompt.build(facts(Rank.SOCIO, 340, 60, false), Language.EN);
 
-        assertTrue(spanish.contains("- Lleva gastados 340 chikilicuatres. Ya está en el rango más alto."), spanish);
-        assertTrue(english.contains("- Lleva gastados 340 Shrutebucks. Already at the highest rank."), english);
+        assertTrue(spanish.contains("- Lleva gastados 340 monedas. Ya está en el rango más alto."), spanish);
+        assertTrue(english.contains("- Lleva gastados 340 coins. Already at the highest rank."), english);
     }
 
     @Test
     void theBalanceIsPutInTheDataBlock() {
         String text = prompt.build(facts(Rank.HABITUAL, 40, 1234, false), Language.ES);
 
-        assertTrue(text.contains("- Saldo: 1234 chikilicuatres."), text);
+        assertTrue(text.contains("- Saldo: 1234 monedas."), text);
     }
 
     @Test
@@ -142,9 +142,9 @@ class BarmanPromptTest {
         String spanish = prompt.build(facts(Rank.NADIE, 0, 100, false), Language.ES);
         String english = prompt.build(facts(Rank.NADIE, 0, 100, false), Language.EN);
 
-        assertTrue(spanish.contains("los chikilicuatres; en la charla también puedes llamarlos fichas."), spanish);
-        assertTrue(english.contains("los Shrutebucks; en la charla también puedes llamarlos chips."), english);
-        assertTrue(spanish.contains("a 50 chikilicuatres una vez al día"), spanish);
+        assertTrue(spanish.contains("- Moneda de la casa: monedas (en la charla también vale decir fichas)."), spanish);
+        assertTrue(english.contains("- Moneda de la casa: coins (en la charla también vale decir chips)."), english);
+        assertTrue(spanish.contains("a 50 monedas una vez al día"), spanish);
     }
 
     @Test

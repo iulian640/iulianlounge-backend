@@ -77,8 +77,8 @@ public class BarmanPrompt {
 
     private static String currency(Language language) {
         return switch (language) {
-            case ES -> "chikilicuatres";
-            case EN -> "Shrutebucks";
+            case ES -> "monedas";
+            case EN -> "coins";
         };
     }
 
