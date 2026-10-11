@@ -35,7 +35,11 @@ Iulian left empty.**
 through the back room ends up being the new Iulian. The club's story is the
 player's story, told in advance.)*
 
-## The currency's name — DECIDED (2026-07-03)
+## The currency's name — DECIDED (2026-07-03), SUPERSEDED (2026-10-11)
+
+> **Note, 2026-10-11:** the currency is now called "coins" ("monedas" in Spanish) in the product. The name "Chikilicuatres" / "Shrutebucks" is kept as history and is superseded.
+
+Original text, superseded:
 
 | Language | Name | Reference |
 |---|---|---|

@@ -8,6 +8,8 @@ Aceptada — 2026-07-03. Enmendada el 2026-09-23 y el 2026-10-07 (ver Historial)
 el 2026-09-25. Los errores que genera Spring (JSON roto, 405...) llevan
 `request.rejected`.
 
+> Nota del 2026-10-11: la moneda se llama ahora «monedas» en el producto. «Chikilicuatres» y «Shrutebucks» en este texto son el nombre anterior, superado.
+
 ## Contexto
 
 El juego es bilingüe (ES/EN) desde el día uno, y su personalidad vive en

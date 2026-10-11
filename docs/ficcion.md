@@ -32,7 +32,11 @@ Iulian dejó vacío.**
 entra por la trastienda acaba siendo el nuevo Iulian. La historia del club
 es la historia del jugador, contada por adelantado.)*
 
-## El nombre de la moneda — DECIDIDO (2026-07-03)
+## El nombre de la moneda — DECIDIDO (2026-07-03), SUPERADO (2026-10-11)
+
+> **Nota del 2026-10-11:** la moneda se llama ahora «monedas» en el producto. El nombre «Chikilicuatres» / «Shrutebucks» queda como historia y está superado.
+
+Texto original, superado:
 
 | Idioma | Nombre | Referencia |
 |---|---|---|

@@ -199,6 +199,8 @@ poker.
 
 ## Pending (does not block Phase 0)
 
+> Note, 2026-10-11: the currency is now called "coins" ("monedas" in Spanish) in the product. The "Chikilicuatres" / "Shrutebucks" name below is superseded.
+
 - ~~Domain extension~~ → **DECIDED (2026-07-04): `iulianlounge.com`, purchased.**
 - ~~Proper name for the currency/tokens~~ → **DECIDED (2026-07-03): Chikilicuatres (ES) / Shrutebucks (EN), see `docs/ficcion.md`.**
 - Choose the secondary game (dice vs scratch card — reference: Scritchy Scratchy).
