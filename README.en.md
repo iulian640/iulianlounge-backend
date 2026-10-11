@@ -21,7 +21,7 @@ Iulian's is a 1920s speakeasy you visit in the browser. This repository is the A
 
 ## Stack
 
-Java 21 and Spring Boot 4. Spring Security with a hand-written JWT filter (jjwt), Spring Data JPA on PostgreSQL 17 in Docker, and Flyway migrations. Tests use JUnit 5, Mockito, MockMvc and a real PostgreSQL.
+Java 21 and Spring Boot 4. Spring Security with a hand-written JWT filter (jjwt), Spring Data JPA on PostgreSQL 17 in Docker, and Flyway migrations. Tests use JUnit 6, Mockito, MockMvc and a real PostgreSQL.
 
 ## Running locally
 

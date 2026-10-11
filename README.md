@@ -21,7 +21,7 @@ Iulian's es un speakeasy de los años 20 que se visita desde el navegador. Este 
 
 ## Stack
 
-Java 21 y Spring Boot 4. Spring Security con un filtro JWT escrito a mano (jjwt), Spring Data JPA sobre PostgreSQL 17 en Docker y migraciones con Flyway. Pruebas con JUnit 5, Mockito, MockMvc y un PostgreSQL real.
+Java 21 y Spring Boot 4. Spring Security con un filtro JWT escrito a mano (jjwt), Spring Data JPA sobre PostgreSQL 17 en Docker y migraciones con Flyway. Pruebas con JUnit 6, Mockito, MockMvc y un PostgreSQL real.
 
 ## Arrancar en local
 
