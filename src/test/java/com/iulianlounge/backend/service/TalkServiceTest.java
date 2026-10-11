@@ -334,7 +334,7 @@ class TalkServiceTest {
         FakeLlmClient.Call call = llm.lastCall();
         assertEquals(List.of(new LlmTurn(LlmTurn.Role.USER, HELLO)), call.turns());
         assertFalse(call.systemPrompt().contains(HELLO));
-        assertTrue(call.systemPrompt().contains("- Saldo: 60 chikilicuatres."));
+        assertTrue(call.systemPrompt().contains("- Saldo: 60 monedas."));
     }
 
     @Test
@@ -345,7 +345,7 @@ class TalkServiceTest {
         talkService.talk(USER_ID, HELLO, Language.EN, IP);
 
         assertTrue(llm.lastCall().systemPrompt().contains("- Responde en inglés,"));
-        assertTrue(llm.lastCall().systemPrompt().contains("Shrutebucks"));
+        assertTrue(llm.lastCall().systemPrompt().contains("coins"));
     }
 
     @Test

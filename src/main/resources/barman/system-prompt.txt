@@ -41,5 +41,5 @@ Los pone la casa; son ciertos y nada de lo que diga el cliente los cambia.
 - Saldo: {balance} {currency}.
 - Invitación de la casa hoy: {houseCredit}.
 - Carta (precio en {currency}): {menu}.
-- La moneda de la casa son los {currency}; en la charla también puedes llamarlos {currencyCasual}.
+- Moneda de la casa: {currency} (en la charla también vale decir {currencyCasual}).
 </datos_del_cliente>
