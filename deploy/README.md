@@ -11,15 +11,14 @@ navegador ──https──> Caddy (web) ──/api──> backend ──> postg
 
 ## Dónde vive
 
-Desde el 25-sep-2026, en una instancia ARM (aarch64) de Oracle Cloud en Madrid,
-`ubuntu@82.70.85.197`, la misma que antes servía MeDeben (ya apagada; su copia
-está en `~/backups/`). Todas las imágenes del compose tienen versión ARM.
+En una instancia ARM (aarch64) de Oracle Cloud en Madrid. Todas las imágenes del
+compose tienen versión ARM.
 
 ## Una sola vez
 
 1. **Servidor**: Ubuntu con Docker. En Oracle, los puertos 80 y 443 tienen que
    estar abiertos en la *security list* de la VCN y en el `iptables` de la
-   máquina (en esta instancia ya lo estaban por MeDeben).
+   máquina.
 2. **Nada más en el 80/443**: si hay un Caddy o nginx instalado en el sistema,
    apágalo (`sudo systemctl disable --now caddy`); el de la compose se encarga.
 3. **DNS** en Cloudflare: dos registros `A` a la IP del servidor, `@` y `www`,
@@ -113,6 +112,5 @@ docker exec lounge-db psql -U postgres -d iulianlounge -c \
   `ANTHROPIC_API_KEY` y el resto de secretos a la terminal.
 - No borrar el volumen `iulianlounge_pgdata`: es la base de datos. El script
   de `postgres-init/` solo corre con el volumen vacío.
-- No usar `docker compose -p deploy ...` en este servidor: `deploy` era el
-  proyecto de MeDeben. El del lounge se llama `iulianlounge` (fijado en la
-  compose).
+- El proyecto de compose se llama `iulianlounge` (fijado en la compose): no
+  lanzarlo con otro `-p`.
