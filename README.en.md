@@ -24,7 +24,6 @@ REST API for IulianLounge, a 1920s speakeasy you visit in the browser: accounts,
 - [Security](#security)
 - [Deployment](#deployment)
 - [Project management](#project-management)
-- [Known issues and future work](#known-issues-and-future-work)
 - [Author](#author)
 
 ## What it does
@@ -277,13 +276,6 @@ The work was tracked in Jira (project IUL): 50 tasks in 15 epics, 43 done. One b
 | 11 | Mobile and delivery | 10 to 13 October |
 
 Between July and September the frontend's 3D lounge was built, outside any sprint. That is why the board jumps from sprint 1 to 8.
-
-## Known issues and future work
-
-- The refresh token is not revoked on the server. Logout clears the browser cookie, but a stolen refresh token is valid until it expires.
-- The AI bartender is switched off in production.
-- There is no admin panel and no Swagger.
-- Usernames are case-sensitive.
 
 ## Author
 

@@ -24,7 +24,6 @@ Español | [English](README.en.md)
 - [Seguridad](#seguridad)
 - [Despliegue](#despliegue)
 - [Gestión del proyecto](#gestión-del-proyecto)
-- [Problemas conocidos y mejoras futuras](#problemas-conocidos-y-mejoras-futuras)
 - [Autor](#autor)
 
 ## Qué hace
@@ -277,13 +276,6 @@ El trabajo se llevó en Jira (proyecto IUL): 50 tareas en 15 épicas, 43 termina
 | 11 | Móvil y entrega | 10 a 13 de octubre |
 
 Entre julio y septiembre se hizo el lounge 3D del frontend, fuera de sprints. Por eso el tablero salta del sprint 1 al 8.
-
-## Problemas conocidos y mejoras futuras
-
-- El refresh token no se revoca en el servidor. El logout borra la cookie del navegador, pero un refresh robado vale hasta que caduque.
-- El barman con IA está apagado en producción.
-- No hay panel de administración ni Swagger.
-- Los nombres de usuario distinguen mayúsculas y minúsculas.
 
 ## Autor
 
