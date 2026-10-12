@@ -7,7 +7,7 @@ REST API for IulianLounge, a 1920s speakeasy you visit in the browser: accounts,
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 ![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg)
 
-[App](https://iulianlounge.com) · [Presentation](https://iulianlounge.com/presentacion/) · [Frontend](https://github.com/iulian640/iulianlounge-frontend) · [Figma](https://www.figma.com/design/ns6uohIpSej1vuw90QWlpX)
+[App](https://iulianlounge.com) · [Presentation](https://iulianlounge.com/presentacion/) · [Frontend](https://github.com/iulian640/iulianlounge-frontend) · [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2)
 
 [Español](README.md) | English
 
@@ -266,7 +266,7 @@ Production runs at https://iulianlounge.com, on an ARM instance of Oracle Cloud 
 
 ## Project management
 
-The work was tracked in Jira (project IUL): 50 tasks in 15 epics, 43 done. One branch per task and commits that carry the task key (`IUL-xx`). The design is in [Figma](https://www.figma.com/design/ns6uohIpSej1vuw90QWlpX).
+The work was tracked in Jira (project IUL): 50 tasks in 15 epics, 43 done. One branch per task and commits that carry the task key (`IUL-xx`). The design is in [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2).
 
 | Sprint | Goal | Dates |
 |---|---|---|

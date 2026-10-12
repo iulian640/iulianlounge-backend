@@ -7,7 +7,7 @@ API REST de IulianLounge, un speakeasy de los años 20 que se visita desde el na
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 ![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg)
 
-[App](https://iulianlounge.com) · [Presentación](https://iulianlounge.com/presentacion/) · [Frontend](https://github.com/iulian640/iulianlounge-frontend) · [Figma](https://www.figma.com/design/ns6uohIpSej1vuw90QWlpX)
+[App](https://iulianlounge.com) · [Presentación](https://iulianlounge.com/presentacion/) · [Frontend](https://github.com/iulian640/iulianlounge-frontend) · [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2)
 
 Español | [English](README.en.md)
 
@@ -266,7 +266,7 @@ Producción está en https://iulianlounge.com, en una instancia ARM de Oracle Cl
 
 ## Gestión del proyecto
 
-El trabajo se llevó en Jira (proyecto IUL): 50 tareas en 15 épicas, 43 terminadas. Una rama por tarea y commits con la clave de la tarea (`IUL-xx`). El diseño está en [Figma](https://www.figma.com/design/ns6uohIpSej1vuw90QWlpX).
+El trabajo se llevó en Jira (proyecto IUL): 50 tareas en 15 épicas, 43 terminadas. Una rama por tarea y commits con la clave de la tarea (`IUL-xx`). El diseño está en [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2).
 
 | Sprint | Objetivo | Fechas |
 |---|---|---|
