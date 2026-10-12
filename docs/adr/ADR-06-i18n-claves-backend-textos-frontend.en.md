@@ -10,6 +10,8 @@ field, the `ErrorCode` enum and the validation keys
 2026-09-25. Errors raised by Spring itself (malformed JSON, 405...) carry
 `request.rejected`.
 
+> Note, 2026-10-11: the currency is now called "coins" in the product. "Chikilicuatres" and "Shrutebucks" in this text are the previous name, superseded.
+
 ## Context
 
 The game is bilingual (ES/EN) from day one, and its personality lives in the

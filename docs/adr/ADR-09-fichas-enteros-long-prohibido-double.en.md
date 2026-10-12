@@ -6,6 +6,8 @@
 
 Accepted — 2026-07-03
 
+> Note, 2026-10-11: the currency is now called "coins" in the product. "Chikilicuatres" and "Shrutebucks" in this text are the previous name, superseded.
+
 ## Context
 
 The entire game economy (bets, rewards, purchases, incremental income,

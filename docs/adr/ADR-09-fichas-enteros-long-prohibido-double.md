@@ -4,6 +4,8 @@
 
 Aceptada — 2026-07-03
 
+> Nota del 2026-10-11: la moneda se llama ahora «monedas» en el producto. «Chikilicuatres» y «Shrutebucks» en este texto son el nombre anterior, superado.
+
 ## Contexto
 
 Toda la economía del juego (apuestas, recompensas, compras, ingresos del

@@ -196,6 +196,8 @@ póker.
 
 ## Pendiente (no bloquea Fase 0)
 
+> Nota del 2026-10-11: la moneda se llama ahora «monedas» en el producto. El nombre «Chikilicuatres» / «Shrutebucks» de abajo está superado.
+
 - ~~Extensión del dominio~~ → **DECIDIDO (2026-07-04): `iulianlounge.com`, comprado.**
 - ~~Nombre propio de la moneda/fichas~~ → **DECIDIDO (2026-07-03): Chikilicuatres (ES) / Shrutebucks (EN), ver `docs/ficcion.md`.**
 - Elegir el juego secundario (dados vs rasca-y-gana — referencia: Scritchy Scratchy).
