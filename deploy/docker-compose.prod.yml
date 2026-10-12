@@ -1,5 +1,5 @@
 # Producción en un VPS: Caddy (HTTPS + frontend + proxy de /api), backend y Postgres.
-# Todo por el mismo origen: el navegador solo habla con Caddy, y la cookie del refresh viaja sin CORS (ADR-08).
+# Todo por el mismo origen: el navegador solo habla con Caddy, y la cookie del refresh viaja sin CORS.
 # Uso (desde la raíz del repo, en el servidor):
 #   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
 
