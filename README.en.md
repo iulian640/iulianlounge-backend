@@ -1,55 +1,175 @@
-# IulianLounge: backend
+# IulianLounge · Backend
+
+REST API for IulianLounge, a 1920s speakeasy you visit in the browser: accounts, a coin wallet, a bar with a bartender and blackjack.
+
+![Java 21](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
+![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg)
+
+[App](https://iulianlounge.com) · [Presentation](https://iulianlounge.com/presentacion/) · [Frontend](https://github.com/iulian640/iulianlounge-frontend) · [Figma](https://www.figma.com/design/ns6uohIpSej1vuw90QWlpX)
 
 [Español](README.md) | English
 
-![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg)
+## Contents
 
-Iulian's is a 1920s speakeasy you visit in the browser. This repository is the API: accounts, sessions, the coin wallet, the bar with its bartender and a blackjack table. The client (Vue 3 and Three.js) lives in [iulianlounge-frontend](https://github.com/iulian640/iulianlounge-frontend).
-
-- App: https://iulianlounge.com
-- Presentation: https://iulianlounge.com/presentacion/
-- This repo: https://github.com/iulian640/iulianlounge-backend
+- [What it does](#what-it-does)
+- [Tech stack](#tech-stack)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Environment variables](#environment-variables)
+- [API](#api)
+- [Tests](#tests)
+- [Database and diagrams](#database-and-diagrams)
+- [Security](#security)
+- [Deployment](#deployment)
+- [Project management](#project-management)
+- [Known issues and future work](#known-issues-and-future-work)
+- [Author](#author)
 
 ## What it does
 
-- Bar: five drinks at fixed prices. Ordering one charges the wallet and the bartender answers according to your rank.
-- Bartender: fixed lines per situation and rank. Free text goes to Claude Haiku (the official Anthropic Java SDK) only when `ANTHROPIC_API_KEY` is set. The LLM never moves money. Limits: a daily budget of 0.50 USD, 30 messages per member per day, 60 per IP per day, 10 per minute and 8 concurrent calls. Without a key, or on any failure, it answers with the fixed line.
-- Ranks: derived from total spent at the bar. Recién llegado (0), Cliente (25), Habitual (100) and Socio (300). In the code they are `NADIE`, `HABITUAL`, `CONFIANZA` and `SOCIO`.
-- House credit: with less balance than the cheapest drink, the house gives 50 coins once a day.
-- Blackjack: one hand against the dealer, bets of 10, 20 or 50. The dealer stands on 17 and blackjack pays 3:2. Actions are idempotent and the deck never leaves the server.
-- Wallet: new accounts get 100 coins. Every movement goes into an append-only ledger.
+- Sign-up and login. Every new account gets a wallet with 100 welcome coins.
+- The bar: five cocktails from 5 to 40 coins. An order is charged to your balance and adds to your total spend, which decides your rank. If you hit zero, the house gives you 50 free coins once a day.
+- Blackjack against the house: bets of 10, 20 or 50. The server shuffles, deals and pays out; the deck never leaves the server.
+- The bartender: answers with fixed lines depending on the situation and your rank. Free text goes to Claude Haiku, but only if the server has `ANTHROPIC_API_KEY`. It is switched off in production. Without a key, or if the model fails, it answers with the fixed line. The model never moves coins.
 
-## Stack
+Ranks come from total spend at the bar: 0, 25, 100 and 300 coins. In the code they are `NADIE`, `HABITUAL`, `CONFIANZA` and `SOCIO`; in the interface, "Recién llegado", "Cliente", "Habitual" and "Socio".
 
-Java 21 and Spring Boot 4. Spring Security with a hand-written JWT filter (jjwt), Spring Data JPA on PostgreSQL 17 in Docker, and Flyway migrations. Tests use JUnit 6, Mockito, MockMvc and a real PostgreSQL.
+## Tech stack
 
-## Running locally
-
-You need JDK 21 and Docker. Environment variables (read by `application.properties` and `docker-compose.yml`):
-
-| Variable | Purpose | Default |
+| Technology | Version | Used for |
 |---|---|---|
-| `DB_PASSWORD` | PostgreSQL password | required |
-| `JWT_SECRET` | HMAC key for the JWTs, base64, 32 bytes or more | required |
-| `DB_PORT` | Local port of the container | `5432` |
-| `DB_URL` | JDBC URL | `jdbc:postgresql://localhost:5432/iulianlounge` |
-| `DB_USERNAME` | Database user | `postgres` |
-| `ANTHROPIC_API_KEY` | Enables free text with the bartender | empty |
+| Java | 21 | Language |
+| Spring Boot | 4.1.0 | Framework (web MVC, validation, Actuator) |
+| Spring Security | the one in Spring Boot 4.1.0 | Authentication and filters |
+| Spring Data JPA | the one in Spring Boot 4.1.0 | Data access |
+| PostgreSQL | 17 | Database |
+| Flyway | the one in Spring Boot 4.1.0 | Migrations (V1 to V7) |
+| jjwt | 0.13.0 | Signing and reading JWTs |
+| anthropic-java | 2.68.0 | Official Anthropic SDK, for the bartender |
+| JaCoCo | 0.8.13 | Coverage |
+| JUnit, Mockito, MockMvc | the ones in Spring Boot 4.1.0 | Tests |
+| Maven Wrapper | included | Build |
+| Docker Compose | | Local PostgreSQL and deployment |
+| Caddy | | Reverse proxy with HTTPS (production) |
+
+## Requirements
+
+- JDK 21
+- Docker (with Docker Compose)
+- Git
+
+You don't need Maven: the repository ships the wrapper (`mvnw` and `mvnw.cmd`).
+
+## Installation
+
+1. Clone the repository and enter the folder:
+
+   ```bash
+   git clone https://github.com/iulian640/iulianlounge-backend.git
+   cd iulianlounge-backend
+   ```
+
+2. Set the environment variables. `DB_PASSWORD` and `JWT_SECRET` are required; the app won't start without them.
+
+   Linux and macOS:
+
+   ```bash
+   export DB_PASSWORD=pick_a_password
+   export JWT_SECRET=$(openssl rand -base64 32)
+   ```
+
+   Windows (PowerShell):
+
+   ```powershell
+   $env:DB_PASSWORD = "pick_a_password"
+   $bytes = New-Object byte[] 32
+   (New-Object System.Security.Cryptography.RNGCryptoServiceProvider).GetBytes($bytes)
+   $env:JWT_SECRET = [Convert]::ToBase64String($bytes)
+   ```
+
+   If port 5432 is taken, use another one: `DB_PORT=5433` and `DB_URL=jdbc:postgresql://localhost:5433/iulianlounge`.
+
+3. Start PostgreSQL:
+
+   ```bash
+   docker compose up -d
+   ```
+
+4. Start the API (Flyway creates the tables on startup):
+
+   ```bash
+   ./mvnw spring-boot:run
+   ```
+
+   On Windows: `.\mvnw.cmd spring-boot:run`.
+
+5. Check that it responds:
+
+   ```bash
+   curl http://localhost:8080/actuator/health
+   ```
+
+   It must return `{"status":"UP"}`. If `JWT_SECRET` is not base64 or is shorter than 32 bytes, the app refuses to start. That is intended.
+
+Start the frontend afterwards, from [its repository](https://github.com/iulian640/iulianlounge-frontend). Its dev server proxies `/api` to `localhost:8080`.
+
+## Environment variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DB_PASSWORD` | Yes | PostgreSQL password. Used by the app and `docker-compose.yml` |
+| `JWT_SECRET` | Yes | HMAC key for the JWTs, base64, 32 bytes or more |
+| `DB_URL` | No | JDBC URL. Defaults to `jdbc:postgresql://localhost:5432/iulianlounge` |
+| `DB_USERNAME` | No | Database user. Defaults to `postgres` |
+| `DB_PORT` | No | Local port of the PostgreSQL container. Defaults to `5432` |
+| `ANTHROPIC_API_KEY` | No | Enables the bartender's free text with Claude Haiku. Empty by default |
+
+## API
+
+Base path `/api/v1`, 15 endpoints. Responses are plain JSON, no envelope. Endpoints marked JWT need the header `Authorization: Bearer <accessToken>`.
+
+| Resource | Method | Path | JWT | What it does |
+|---|---|---|---|---|
+| Auth | POST | `/auth/register` | No | Creates the account and its wallet with 100 coins |
+| Auth | POST | `/auth/login` | No | Returns the access token and sets the `refresh_token` cookie |
+| Auth | POST | `/auth/refresh` | No (cookie) | Issues a new access token and rotates the cookie |
+| Auth | POST | `/auth/logout` | No | Clears the refresh cookie |
+| Profile | GET | `/me` | Yes | User, language and rank |
+| Wallet | GET | `/wallet` | Yes | Balance |
+| Wallet | GET | `/wallet/transactions` | Yes | Paginated movements (`page`, `size`, max 50) |
+| Bar | GET | `/bar` | Yes | Menu, balance, rank and whether house credit is available |
+| Bar | POST | `/bar/orders` | Yes | Orders a cocktail (`Idempotency-Key` header) |
+| Bar | POST | `/bar/house-credit` | Yes | Claims the daily 50 coins from the house |
+| Bar | POST | `/bar/talk` | Yes | Free text to the bartender |
+| Blackjack | GET | `/blackjack` | Yes | Hand in progress (or `null`), balance and available bets |
+| Blackjack | POST | `/blackjack/hands` | Yes | Deals a hand (`Idempotency-Key` and bet) |
+| Blackjack | POST | `/blackjack/hands/{id}/hit` | Yes | Draws a card |
+| Blackjack | POST | `/blackjack/hands/{id}/stand` | Yes | Stands; the house plays |
+
+`GET /actuator/health` is public and is the only Actuator endpoint exposed.
+
+Sign-up and login example:
 
 ```bash
-export DB_PASSWORD=pick_a_password
-export JWT_SECRET=$(openssl rand -base64 32)
-# If 5432 is taken: export DB_PORT=5433 and DB_URL=jdbc:postgresql://localhost:5433/iulianlounge
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"iulian","email":"iulian@example.com","password":"a-long-password","locale":"en"}'
 
-docker compose up -d        # PostgreSQL
-./mvnw spring-boot:run      # API on localhost:8080
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"username":"iulian","password":"a-long-password"}'
 ```
 
-`curl localhost:8080/actuator/health` should return `{"status":"UP"}`. If `JWT_SECRET` is not base64 or decodes to fewer than 32 bytes, the app refuses to start, on purpose.
+Login returns `{"accessToken":"..."}` and stores the refresh cookie in `cookies.txt`. With the token you can call the rest:
 
-The frontend dev server proxies `/api` to `localhost:8080`.
+```bash
+curl http://localhost:8080/api/v1/wallet -H "Authorization: Bearer <accessToken>"
+```
 
-Without `ANTHROPIC_API_KEY` the bartender never touches the network and always answers with the fixed line.
+Errors follow RFC 7807 (`ProblemDetail`) with a stable `code` that the frontend translates. The list is in [`ErrorCode`](src/main/java/com/iulianlounge/backend/exception/ErrorCode.java).
 
 ## Tests
 
@@ -57,117 +177,24 @@ Without `ANTHROPIC_API_KEY` the bartender never touches the network and always a
 ./mvnw verify
 ```
 
-Last run: 636 tests, 0 failures. JaCoCo reports close to 99 % instruction coverage, and the build fails if line coverage drops below 80 % (`pom.xml`). There are four kinds:
+It needs the Docker database running (`docker compose up -d`) and `DB_PASSWORD` and `JWT_SECRET` set, because the integration tests use a real PostgreSQL.
 
-- Unit tests for services and domain, including the blackjack engine, which is plain Java.
-- MockMvc slices for controllers, filters and errors.
-- Integration tests against a real PostgreSQL (the one from `docker compose`, through `DB_URL`).
-- Concurrency tests for the ledger and the bartender memory.
+There are 627 tests in 55 classes:
 
-Integration tests need the database up.
+| Type | Classes | Built with |
+|---|---|---|
+| Unit | 34 (9 with Mockito) | JUnit and Mockito |
+| Controllers and filters | 10 | MockMvc with `@WebMvcTest` |
+| Repositories | 3 | `@DataJpaTest` against PostgreSQL |
+| Integration | 8 | `@SpringBootTest` |
 
-## API
+Line coverage is 98.9% with JaCoCo, and the build fails below 80% (configured in `pom.xml`).
 
-Base path `/api/v1`, 15 endpoints. Responses are plain JSON, no envelope. "JWT" means an `Authorization: Bearer <accessToken>` header.
+![JaCoCo coverage report](docs/img/coverage-jacoco.webp)
 
-| Method | Path | Auth | Purpose |
-|---|---|---|---|
-| POST | `/auth/register` | public | Creates the account and a wallet with 100 coins |
-| POST | `/auth/login` | public | Returns the access token and sets the `refresh_token` cookie |
-| POST | `/auth/refresh` | public (cookie) | Issues a new access token and rotates the cookie |
-| POST | `/auth/logout` | public | Clears the refresh cookie |
-| GET | `/me` | JWT | User, locale and rank |
-| GET | `/wallet` | JWT | Balance |
-| GET | `/wallet/transactions` | JWT | Paginated movements (`page`, `size`, max 50) |
-| GET | `/bar` | JWT | Menu, balance, rank and whether house credit is available |
-| POST | `/bar/orders` | JWT | Orders a drink (`Idempotency-Key` header) |
-| POST | `/bar/house-credit` | JWT | Claims the daily 50-coin house credit |
-| POST | `/bar/talk` | JWT | Free text to the bartender |
-| GET | `/blackjack` | JWT | Hand in progress (or `null`), balance and possible bets |
-| POST | `/blackjack/hands` | JWT | Deals a hand (`Idempotency-Key` and a bet) |
-| POST | `/blackjack/hands/{id}/hit` | JWT | Draws a card |
-| POST | `/blackjack/hands/{id}/stand` | JWT | Stands, then the dealer plays |
+## Database and diagrams
 
-`GET /actuator/health` is also public and is the only Actuator endpoint exposed.
-
-Errors follow RFC 7807 (`ProblemDetail`) with a stable `code`. The frontend translates the `code`; `detail` is English and only for debugging:
-
-```json
-{
-  "status": 400,
-  "code": "validation.failed",
-  "detail": "Request validation failed",
-  "errors": { "email": "validation.email", "password": "validation.size" }
-}
-```
-
-The full list of codes is in [`ErrorCode`](src/main/java/com/iulianlounge/backend/exception/ErrorCode.java).
-
-## Security
-
-- Spring Security with no server session and a custom `OncePerRequestFilter` for the JWT (jjwt). The access token is short-lived and the frontend keeps it in memory.
-- The refresh token travels in an `HttpOnly; Secure; SameSite=Strict` cookie. Logout clears it in the browser; the server does not revoke it, so a stolen refresh token stays valid until it expires.
-- Passwords use BCrypt. If the user does not exist, login compares against a dummy hash so response time does not give it away.
-- `AuthRateLimitFilter` limits login and register per IP. `MemberRateLimitFilter` limits orders, bets and `talk` per member.
-- Behind the proxy, the client IP is resolved with `server.forward-headers-strategy=native`. Caddy strips forwarding headers the client could spoof.
-- Errors use `ProblemDetail` with no stack traces or internal messages, and Caddy caps the request body size.
-- The database backs the domain with `CHECK` constraints: `balance >= 0`, signed amounts by movement type, bets of 10, 20 or 50.
-
-## How it's built
-
-### Layers
-
-Every request goes through the filters and then down the layers: the controller speaks HTTP, the service holds the rules and the repository talks to the database. No controller touches a repository.
-
-```mermaid
-flowchart LR
-    client([Browser]) --> caddy[Caddy]
-    caddy -->|/api| rl["AuthRateLimitFilter<br/>JwtAuthenticationFilter<br/>MemberRateLimitFilter"]
-    rl --> ctrl["Controllers<br/>Auth, Me, Wallet,<br/>Bar, BarTalk, Blackjack"]
-    ctrl --> svc["Services<br/>Auth, Wallet, Bar,<br/>Talk, Blackjack"]
-    svc --> repo[Repositories]
-    repo --> db[(PostgreSQL)]
-    svc -. free text .-> llm[Claude Haiku]
-    ctrl -. exceptions .-> handler[GlobalExceptionHandler]
-```
-
-### A session, start to finish
-
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant A as API
-    participant D as PostgreSQL
-
-    B->>A: POST /auth/login {username, password}
-    A->>D: find user, compare BCrypt hash
-    A-->>B: 200 {accessToken} + Set-Cookie refresh_token
-    B->>A: GET /me (Authorization: Bearer access)
-    A-->>B: 200 {userId, username, locale, rank}
-    Note over B,A: 15 minutes later the access token expires
-    B->>A: GET /me
-    A-->>B: 401 auth.required
-    B->>A: POST /auth/refresh (browser attaches the cookie)
-    A-->>B: 200 {accessToken} + new cookie with the same expiry
-    B->>A: POST /auth/logout
-    A-->>B: 204 + cleared cookie
-```
-
-### Data
-
-PostgreSQL 17 in Docker and Flyway migrations V1 to V7:
-
-| Migration | What it does |
-|---|---|
-| `V1__create_users_table.sql` | Users table |
-| `V2__make_email_unique_case_insensitive.sql` | Case-insensitive unique email |
-| `V3__constrain_user_role_and_locale.sql` | `CHECK` on role and locale |
-| `V4__create_wallet_and_ledger.sql` | Wallet and ledger |
-| `V5__allow_bar_movement_types.sql` | `BAR_ORDER` and `HOUSE_CREDIT` types |
-| `V6__index_and_sign_bar_movements.sql` | Index by wallet and type, and the sign of `BAR_ORDER` |
-| `V7__create_blackjack_hand_and_ledger_types.sql` | Hands table and blackjack types |
-
-The ledger is append-only and the balance is materialized in `wallet`. Amounts are `long` in Java and `bigint` in the database. Indexes, class diagrams and the sequences for ordering a drink and dealing a hand are in [docs/diagramas.md](docs/diagramas.md) (Spanish).
+The balance is a movement ledger: every change is a row in `token_transaction` and `wallet.balance` stores the result. Coins are integers (`bigint`) and a `CHECK` prevents a negative balance. Flyway migrations run from V1 to V7.
 
 ```mermaid
 erDiagram
@@ -222,16 +249,42 @@ erDiagram
     }
 ```
 
+The class and sequence diagrams (ordering a cocktail, dealing and paying out a hand) are in [docs/diagramas.md](docs/diagramas.md), written in Spanish.
+
+## Security
+
+- Passwords hashed with BCrypt. If the user doesn't exist, login compares against a fake hash so response time doesn't give it away.
+- 15-minute access JWT, with Spring Security and a custom filter (`OncePerRequestFilter`) that validates it. No server-side session.
+- The refresh token travels in a cookie that is `HttpOnly`, `Secure` and `SameSite=Strict`.
+- Limit of 20 attempts per minute on login and sign-up.
+- Orders and bets are idempotent: repeating the same `Idempotency-Key` never charges twice.
+- Errors don't expose stack traces or internal details.
+
 ## Deployment
 
-Production runs at https://iulianlounge.com on an Oracle Cloud ARM instance in Madrid with Docker Compose: PostgreSQL, the backend and Caddy, which serves the frontend build, proxies `/api` and gets HTTPS from Let's Encrypt. A database dump is taken before migrating. Steps are in [deploy/README.md](deploy/README.md) (Spanish).
+Production runs at https://iulianlounge.com, on an ARM instance of Oracle Cloud in Madrid. Docker Compose runs PostgreSQL, the backend and Caddy, which serves the frontend, forwards `/api` and gets HTTPS from Let's Encrypt. The steps are in [deploy/README.md](deploy/README.md), written in Spanish.
 
-## Documentation
+## Project management
 
-The ER, class and sequence diagrams, in Mermaid, are in [docs/diagramas.md](docs/diagramas.md) (Spanish).
+The work was tracked in Jira (project IUL): 50 tasks in 15 epics, 43 done. One branch per task and commits that carry the task key (`IUL-xx`). The design is in [Figma](https://www.figma.com/design/ns6uohIpSej1vuw90QWlpX).
 
-## Process
+| Sprint | Goal | Dates |
+|---|---|---|
+| 1 | Auth and wallet | 3 to 17 July |
+| 8 | Full auth | 16 to 22 September |
+| 9 | Wallet, HUD and mobile | 25 September to 1 October |
+| 10 | Bar and blackjack | 7 to 9 October |
+| 11 | Mobile and delivery | 10 to 13 October |
 
-Work was tracked in Jira (project IUL): 50 tasks in 15 epics. Sprint 1 Auth and wallet (3 to 17 July), the summer on the 3D lounge, Sprint 8 Full auth (16 to 22 September), Sprint 9 Wallet, HUD and mobile (25 September to 1 October), Sprint 10 Bar and blackjack (7 to 9 October) and Sprint 11 Mobile and delivery (10 to 13 October). Commits follow conventional commits with the Jira key.
+Between July and September the frontend's 3D lounge was built, outside any sprint. That is why the board jumps from sprint 1 to 8.
 
-Frontend repository: https://github.com/iulian640/iulianlounge-frontend
+## Known issues and future work
+
+- The refresh token is not revoked on the server. Logout clears the browser cookie, but a stolen refresh token is valid until it expires.
+- The AI bartender is switched off in production.
+- There is no admin panel and no Swagger.
+- Usernames are case-sensitive.
+
+## Author
+
+Iulian Timofei · [github.com/iulian640](https://github.com/iulian640)
