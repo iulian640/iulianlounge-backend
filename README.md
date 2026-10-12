@@ -5,7 +5,7 @@ API REST de IulianLounge, un speakeasy de los años 20 que se visita desde el na
 ![Java 21](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
 ![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
-![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml)
 
 [App](https://iulianlounge.com) · [Presentación](https://iulianlounge.com/presentacion/) · [Frontend](https://github.com/iulian640/iulianlounge-frontend) · [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2)
 
@@ -24,7 +24,6 @@ Español | [English](README.en.md)
 - [Seguridad](#seguridad)
 - [Despliegue](#despliegue)
 - [Gestión del proyecto](#gestión-del-proyecto)
-- [Problemas conocidos y mejoras futuras](#problemas-conocidos-y-mejoras-futuras)
 - [Autor](#autor)
 
 ## Qué hace
@@ -34,7 +33,7 @@ Español | [English](README.en.md)
 - Blackjack contra la casa: apuestas de 10, 20 o 50. El servidor baraja, reparte y paga; el mazo no sale nunca del servidor.
 - El barman: responde con frases fijas según la situación y tu rango. El texto libre va a Claude Haiku, pero solo si el servidor tiene `ANTHROPIC_API_KEY`. Está apagado en producción. Sin clave, o si el modelo falla, contesta con la frase fija. El modelo nunca mueve monedas.
 
-Los rangos salen del gasto total en la barra: 0, 25, 100 y 300 monedas. En el código se llaman `NADIE`, `HABITUAL`, `CONFIANZA` y `SOCIO`; en la interfaz, «Recién llegado», «Cliente», «Habitual» y «Socio».
+Los rangos salen del gasto total en la barra: Recién llegado (0), Cliente (25), Habitual (100) y Socio (300 monedas).
 
 ## Tecnologías
 
@@ -42,14 +41,11 @@ Los rangos salen del gasto total en la barra: 0, 25, 100 y 300 monedas. En el c�
 |---|---|---|
 | Java | 21 | Lenguaje |
 | Spring Boot | 4.1.0 | Framework (web MVC, validación, Actuator) |
-| Spring Security | la de Spring Boot 4.1.0 | Autenticación y filtros |
-| Spring Data JPA | la de Spring Boot 4.1.0 | Acceso a datos |
 | PostgreSQL | 17 | Base de datos |
-| Flyway | la de Spring Boot 4.1.0 | Migraciones (V1 a V7) |
 | jjwt | 0.13.0 | Firma y lectura de los JWT |
 | anthropic-java | 2.68.0 | SDK oficial de Anthropic, para el barman |
 | JaCoCo | 0.8.13 | Cobertura |
-| JUnit, Mockito, MockMvc | las de Spring Boot 4.1.0 | Tests |
+| Spring Security, Spring Data JPA, Flyway, JUnit, Mockito y MockMvc | gestionadas por Spring Boot 4.1.0 | Autenticación, acceso a datos, migraciones (V1 a V7) y tests |
 | Maven Wrapper | incluido | Build |
 | Docker Compose | | PostgreSQL local y despliegue |
 | Caddy | | Proxy inverso con HTTPS (producción) |
@@ -89,7 +85,17 @@ Maven no hace falta: el repositorio trae el wrapper (`mvnw` y `mvnw.cmd`).
    $env:JWT_SECRET = [Convert]::ToBase64String($bytes)
    ```
 
-   Si el puerto 5432 está ocupado, usa otro: `DB_PORT=5433` y `DB_URL=jdbc:postgresql://localhost:5433/iulianlounge`.
+   Si el puerto 5432 está ocupado (por ejemplo, por un PostgreSQL instalado en tu máquina), cambia el puerto antes del paso 3:
+
+   ```bash
+   export DB_PORT=5433
+   export DB_URL=jdbc:postgresql://localhost:5433/iulianlounge
+   ```
+
+   ```powershell
+   $env:DB_PORT = "5433"
+   $env:DB_URL = "jdbc:postgresql://localhost:5433/iulianlounge"
+   ```
 
 3. Levanta PostgreSQL:
 
@@ -104,6 +110,10 @@ Maven no hace falta: el repositorio trae el wrapper (`mvnw` y `mvnw.cmd`).
    ```
 
    En Windows: `.\mvnw.cmd spring-boot:run`.
+
+   Las variables solo existen en esa terminal. Si arrancas desde IntelliJ, ponlas en Run > Edit Configurations > Environment variables.
+
+   Si cambias `DB_PASSWORD` después del primer `docker compose up`, PostgreSQL conserva la antigua en el volumen y verás `password authentication failed`. Para empezar de cero: `docker compose down -v`.
 
 5. Comprueba que responde:
 
@@ -134,17 +144,17 @@ Ruta base `/api/v1`, 15 endpoints. Las respuestas son JSON plano, sin envoltorio
 |---|---|---|---|---|
 | Auth | POST | `/auth/register` | No | Crea la cuenta y su cartera con 100 monedas |
 | Auth | POST | `/auth/login` | No | Devuelve el access token y pone la cookie `refresh_token` |
-| Auth | POST | `/auth/refresh` | No (cookie) | Emite un access token nuevo y rota la cookie |
+| Auth | POST | `/auth/refresh` | No (cookie) | Emite un access token nuevo y renueva la cookie (sin alargar los 7 días) |
 | Auth | POST | `/auth/logout` | No | Borra la cookie del refresh |
 | Perfil | GET | `/me` | Sí | Usuario, idioma y rango |
 | Cartera | GET | `/wallet` | Sí | Saldo |
 | Cartera | GET | `/wallet/transactions` | Sí | Movimientos paginados (`page`, `size`, máximo 50) |
 | Barra | GET | `/bar` | Sí | Carta, saldo, rango y si hay crédito de la casa disponible |
-| Barra | POST | `/bar/orders` | Sí | Pide un cóctel (cabecera `Idempotency-Key`) |
+| Barra | POST | `/bar/orders` | Sí | Pide un cóctel. Cabecera `Idempotency-Key` con un UUID; body `{"drink":"SIDECAR"}` |
 | Barra | POST | `/bar/house-credit` | Sí | Pide las 50 monedas diarias de la casa |
 | Barra | POST | `/bar/talk` | Sí | Texto libre al barman |
 | Blackjack | GET | `/blackjack` | Sí | Mano en curso (o `null`), saldo y apuestas posibles |
-| Blackjack | POST | `/blackjack/hands` | Sí | Reparte una mano (`Idempotency-Key` y apuesta) |
+| Blackjack | POST | `/blackjack/hands` | Sí | Reparte una mano. `Idempotency-Key` (UUID); body `{"bet":"TEN"}` |
 | Blackjack | POST | `/blackjack/hands/{id}/hit` | Sí | Pide carta |
 | Blackjack | POST | `/blackjack/hands/{id}/stand` | Sí | Se planta y juega la casa |
 
@@ -163,7 +173,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d '{"username":"iulian","password":"una-clave-larga"}'
 ```
 
-El login devuelve `{"accessToken":"..."}` y guarda la cookie del refresh en `cookies.txt`. Con el token ya puedes llamar al resto:
+El login devuelve `{"accessToken":"...","expiresIn":900}` y guarda la cookie del refresh en `cookies.txt`. Con el token ya puedes llamar al resto:
 
 ```bash
 curl http://localhost:8080/api/v1/wallet -H "Authorization: Bearer <accessToken>"
@@ -177,13 +187,13 @@ Los errores siguen RFC 7807 (`ProblemDetail`) con un `code` estable que el front
 ./mvnw verify
 ```
 
-Necesita la base de datos de Docker levantada (`docker compose up -d`) y las variables `DB_PASSWORD` y `JWT_SECRET` definidas, porque los tests de integración usan un PostgreSQL real.
+Necesita la base de datos de Docker levantada (`docker compose up -d`) y `DB_PASSWORD` definida, porque los tests de integración usan un PostgreSQL real.
 
-Hay 627 tests en 55 clases:
+Hay 627 tests en 56 clases:
 
 | Tipo | Clases | Con qué |
 |---|---|---|
-| Unitarios | 34 (9 con Mockito) | JUnit y Mockito |
+| Unitarios | 35 (9 con Mockito) | JUnit y Mockito |
 | Controllers y filtros | 10 | MockMvc con `@WebMvcTest` |
 | Repositorios | 3 | `@DataJpaTest` contra PostgreSQL |
 | Integración | 8 | `@SpringBootTest` |
@@ -266,7 +276,7 @@ Producción está en https://iulianlounge.com, en una instancia ARM de Oracle Cl
 
 ## Gestión del proyecto
 
-El trabajo se llevó en Jira (proyecto IUL): 50 tareas en 15 épicas, 43 terminadas. Una rama por tarea y commits con la clave de la tarea (`IUL-xx`). El diseño está en [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2).
+El trabajo se llevó en Jira (proyecto IUL): 50 tareas en 15 épicas. Una rama por tarea y commits con la clave de la tarea (`IUL-xx`). El diseño está en [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2).
 
 | Sprint | Objetivo | Fechas |
 |---|---|---|
@@ -277,13 +287,6 @@ El trabajo se llevó en Jira (proyecto IUL): 50 tareas en 15 épicas, 43 termina
 | 11 | Móvil y entrega | 10 a 13 de octubre |
 
 Entre julio y septiembre se hizo el lounge 3D del frontend, fuera de sprints. Por eso el tablero salta del sprint 1 al 8.
-
-## Problemas conocidos y mejoras futuras
-
-- El refresh token no se revoca en el servidor. El logout borra la cookie del navegador, pero un refresh robado vale hasta que caduque.
-- El barman con IA está apagado en producción.
-- No hay panel de administración ni Swagger.
-- Los nombres de usuario distinguen mayúsculas y minúsculas.
 
 ## Autor
 
