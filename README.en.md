@@ -5,7 +5,7 @@ REST API for IulianLounge, a 1920s speakeasy you visit in the browser: accounts,
 ![Java 21](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
 ![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
 ![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
-![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/iulian640/iulianlounge-backend/actions/workflows/ci.yml)
 
 [App](https://iulianlounge.com) · [Presentation](https://iulianlounge.com/presentacion/) · [Frontend](https://github.com/iulian640/iulianlounge-frontend) · [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2)
 
@@ -33,7 +33,7 @@ REST API for IulianLounge, a 1920s speakeasy you visit in the browser: accounts,
 - Blackjack against the house: bets of 10, 20 or 50. The server shuffles, deals and pays out; the deck never leaves the server.
 - The bartender: answers with fixed lines depending on the situation and your rank. Free text goes to Claude Haiku, but only if the server has `ANTHROPIC_API_KEY`. It is switched off in production. Without a key, or if the model fails, it answers with the fixed line. The model never moves coins.
 
-Ranks come from total spend at the bar: 0, 25, 100 and 300 coins. In the code they are `NADIE`, `HABITUAL`, `CONFIANZA` and `SOCIO`; in the interface, "Recién llegado", "Cliente", "Habitual" and "Socio".
+Ranks come from total spending at the bar: Newcomer (0), Customer (25), Regular (100) and Member (300 coins).
 
 ## Tech stack
 
@@ -41,14 +41,11 @@ Ranks come from total spend at the bar: 0, 25, 100 and 300 coins. In the code th
 |---|---|---|
 | Java | 21 | Language |
 | Spring Boot | 4.1.0 | Framework (web MVC, validation, Actuator) |
-| Spring Security | the one in Spring Boot 4.1.0 | Authentication and filters |
-| Spring Data JPA | the one in Spring Boot 4.1.0 | Data access |
 | PostgreSQL | 17 | Database |
-| Flyway | the one in Spring Boot 4.1.0 | Migrations (V1 to V7) |
 | jjwt | 0.13.0 | Signing and reading JWTs |
 | anthropic-java | 2.68.0 | Official Anthropic SDK, for the bartender |
 | JaCoCo | 0.8.13 | Coverage |
-| JUnit, Mockito, MockMvc | the ones in Spring Boot 4.1.0 | Tests |
+| Spring Security, Spring Data JPA, Flyway, JUnit, Mockito and MockMvc | managed by Spring Boot 4.1.0 | Authentication, data access, migrations (V1 to V7) and tests |
 | Maven Wrapper | included | Build |
 | Docker Compose | | Local PostgreSQL and deployment |
 | Caddy | | Reverse proxy with HTTPS (production) |
@@ -88,7 +85,17 @@ You don't need Maven: the repository ships the wrapper (`mvnw` and `mvnw.cmd`).
    $env:JWT_SECRET = [Convert]::ToBase64String($bytes)
    ```
 
-   If port 5432 is taken, use another one: `DB_PORT=5433` and `DB_URL=jdbc:postgresql://localhost:5433/iulianlounge`.
+   If port 5432 is taken (for example, by a PostgreSQL installed on your machine), change the port before step 3:
+
+   ```bash
+   export DB_PORT=5433
+   export DB_URL=jdbc:postgresql://localhost:5433/iulianlounge
+   ```
+
+   ```powershell
+   $env:DB_PORT = "5433"
+   $env:DB_URL = "jdbc:postgresql://localhost:5433/iulianlounge"
+   ```
 
 3. Start PostgreSQL:
 
@@ -103,6 +110,10 @@ You don't need Maven: the repository ships the wrapper (`mvnw` and `mvnw.cmd`).
    ```
 
    On Windows: `.\mvnw.cmd spring-boot:run`.
+
+   The variables only exist in that terminal. If you start the app from IntelliJ, set them in Run > Edit Configurations > Environment variables.
+
+   If you change `DB_PASSWORD` after the first `docker compose up`, PostgreSQL keeps the old one in the volume and you will see `password authentication failed`. To start from scratch: `docker compose down -v`.
 
 5. Check that it responds:
 
@@ -133,17 +144,17 @@ Base path `/api/v1`, 15 endpoints. Responses are plain JSON, no envelope. Endpoi
 |---|---|---|---|---|
 | Auth | POST | `/auth/register` | No | Creates the account and its wallet with 100 coins |
 | Auth | POST | `/auth/login` | No | Returns the access token and sets the `refresh_token` cookie |
-| Auth | POST | `/auth/refresh` | No (cookie) | Issues a new access token and rotates the cookie |
+| Auth | POST | `/auth/refresh` | No (cookie) | Issues a new access token and renews the cookie (without extending the 7 days) |
 | Auth | POST | `/auth/logout` | No | Clears the refresh cookie |
 | Profile | GET | `/me` | Yes | User, language and rank |
 | Wallet | GET | `/wallet` | Yes | Balance |
 | Wallet | GET | `/wallet/transactions` | Yes | Paginated movements (`page`, `size`, max 50) |
 | Bar | GET | `/bar` | Yes | Menu, balance, rank and whether house credit is available |
-| Bar | POST | `/bar/orders` | Yes | Orders a cocktail (`Idempotency-Key` header) |
+| Bar | POST | `/bar/orders` | Yes | Orders a cocktail. `Idempotency-Key` header with a UUID; body `{"drink":"SIDECAR"}` |
 | Bar | POST | `/bar/house-credit` | Yes | Claims the daily 50 coins from the house |
 | Bar | POST | `/bar/talk` | Yes | Free text to the bartender |
 | Blackjack | GET | `/blackjack` | Yes | Hand in progress (or `null`), balance and available bets |
-| Blackjack | POST | `/blackjack/hands` | Yes | Deals a hand (`Idempotency-Key` and bet) |
+| Blackjack | POST | `/blackjack/hands` | Yes | Deals a hand. `Idempotency-Key` (UUID); body `{"bet":"TEN"}` |
 | Blackjack | POST | `/blackjack/hands/{id}/hit` | Yes | Draws a card |
 | Blackjack | POST | `/blackjack/hands/{id}/stand` | Yes | Stands; the house plays |
 
@@ -162,7 +173,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d '{"username":"iulian","password":"a-long-password"}'
 ```
 
-Login returns `{"accessToken":"..."}` and stores the refresh cookie in `cookies.txt`. With the token you can call the rest:
+Login returns `{"accessToken":"...","expiresIn":900}` and stores the refresh cookie in `cookies.txt`. With the token you can call the rest:
 
 ```bash
 curl http://localhost:8080/api/v1/wallet -H "Authorization: Bearer <accessToken>"
@@ -176,13 +187,13 @@ Errors follow RFC 7807 (`ProblemDetail`) with a stable `code` that the frontend 
 ./mvnw verify
 ```
 
-It needs the Docker database running (`docker compose up -d`) and `DB_PASSWORD` and `JWT_SECRET` set, because the integration tests use a real PostgreSQL.
+It needs the Docker database running (`docker compose up -d`) and `DB_PASSWORD` set, because the integration tests use a real PostgreSQL.
 
-There are 627 tests in 55 classes:
+There are 627 tests in 56 classes:
 
 | Type | Classes | Built with |
 |---|---|---|
-| Unit | 34 (9 with Mockito) | JUnit and Mockito |
+| Unit | 35 (9 with Mockito) | JUnit and Mockito |
 | Controllers and filters | 10 | MockMvc with `@WebMvcTest` |
 | Repositories | 3 | `@DataJpaTest` against PostgreSQL |
 | Integration | 8 | `@SpringBootTest` |
@@ -203,48 +214,48 @@ erDiagram
 
     users {
         uuid id PK
-        varchar username UK "50, [A-Za-z0-9_.-]"
-        text email UK "unique, case-insensitive"
-        varchar password_hash "BCrypt"
-        text role "CHECK: USER, ADMIN"
-        text locale "CHECK: es, en"
-        timestamptz created_at
-        timestamptz last_seen_at
+        varchar username UK "VARCHAR(50), NOT NULL"
+        text email UK "NOT NULL, unique on lower(email)"
+        varchar password_hash "VARCHAR(60), NOT NULL, BCrypt"
+        text role "NOT NULL, CHECK USER or ADMIN"
+        text locale "NOT NULL, CHECK es or en"
+        timestamptz created_at "NOT NULL"
+        timestamptz last_seen_at "nullable"
     }
 
     wallet {
         uuid id PK
-        uuid user_id FK,UK "ON DELETE CASCADE"
-        bigint balance "CHECK >= 0"
-        bigint version "optimistic lock"
-        timestamptz created_at
+        uuid user_id FK,UK "NOT NULL, ON DELETE CASCADE"
+        bigint balance "NOT NULL, CHECK >= 0"
+        bigint version "NOT NULL, optimistic lock"
+        timestamptz created_at "NOT NULL"
     }
 
     token_transaction {
         uuid id PK
-        uuid wallet_id FK "ON DELETE RESTRICT"
-        bigint amount "signed, BAR_ORDER and BLACKJACK_BET always < 0"
-        text type "WELCOME_BONUS, BAR_ORDER, HOUSE_CREDIT, BLACKJACK_BET, BLACKJACK_PAYOUT"
-        bigint balance_after "CHECK >= 0"
-        text idempotency_key "unique per wallet, max 64"
-        timestamptz created_at
+        uuid wallet_id FK "NOT NULL, ON DELETE RESTRICT"
+        bigint amount "NOT NULL, signed, CHECK not 0"
+        text type "NOT NULL, CHECK on types"
+        bigint balance_after "NOT NULL, CHECK >= 0"
+        text idempotency_key "nullable, max 64 characters"
+        timestamptz created_at "NOT NULL"
     }
 
     blackjack_hand {
         uuid id PK
-        uuid user_id FK "ON DELETE CASCADE, one PLAYER_TURN per member"
-        uuid idempotency_key "unique per member"
-        bigint bet "CHECK: 10, 20, 50"
-        text status "PLAYER_TURN, FINISHED, VOID"
-        text outcome "BLACKJACK, WIN, PUSH, LOSE"
-        bigint payout "tied to the outcome"
-        text deck "server only"
-        text player_cards
-        text dealer_cards "server only until the hand ends"
-        bigint version "optimistic lock"
-        timestamptz created_at
-        timestamptz finished_at
-        timestamptz settled_at
+        uuid user_id FK "NOT NULL, ON DELETE CASCADE"
+        uuid idempotency_key UK "NOT NULL, unique with user_id"
+        bigint bet "NOT NULL, CHECK 10, 20 or 50"
+        text status "NOT NULL, CHECK PLAYER_TURN, FINISHED or VOID"
+        text outcome "nullable, CHECK BLACKJACK, WIN, PUSH or LOSE"
+        bigint payout "nullable, tied to the outcome"
+        text deck "NOT NULL, server only"
+        text player_cards "NOT NULL"
+        text dealer_cards "NOT NULL, server only until the hand ends"
+        bigint version "NOT NULL, optimistic lock"
+        timestamptz created_at "NOT NULL"
+        timestamptz finished_at "nullable"
+        timestamptz settled_at "nullable"
     }
 ```
 
@@ -265,7 +276,7 @@ Production runs at https://iulianlounge.com, on an ARM instance of Oracle Cloud 
 
 ## Project management
 
-The work was tracked in Jira (project IUL): 50 tasks in 15 epics, 43 done. One branch per task and commits that carry the task key (`IUL-xx`). The design is in [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2).
+The work was tracked in Jira (project IUL): 50 tasks in 15 epics. One branch per task and commits that carry the task key (`IUL-xx`). The design is in [Penpot](https://design.penpot.app/#/view?file-id=52a5041f-08a1-80f1-8008-c797da3e231e&page-id=72937cd6-6e9c-4b4e-991d-639a5ecf7b58&section=interactions&index=0&share-id=d0c6b4b3-247d-4110-95db-19385af7feb2).
 
 | Sprint | Goal | Dates |
 |---|---|---|
