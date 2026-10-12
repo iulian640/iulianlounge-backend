@@ -2,7 +2,7 @@
 
 Un VPS con Docker. Caddy pone el HTTPS, sirve el frontend y reenvía `/api` al
 backend, así que el navegador solo habla con un origen y la cookie del refresh
-funciona sin CORS (ADR-08). Postgres no se publica: solo lo ven los contenedores.
+funciona sin CORS. Postgres no se publica: solo lo ven los contenedores.
 
 ```
 navegador ──https──> Caddy (web) ──/api──> backend ──> postgres

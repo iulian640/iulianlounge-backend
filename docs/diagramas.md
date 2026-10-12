@@ -2,7 +2,6 @@
 
 Cinco diagramas: la base de datos, las clases del dominio, las clases por capas, el flujo de pedir una copa y el de repartir y pagar una mano de blackjack.
 Todos salen del código: migraciones Flyway V1 a V7 y paquetes de `com.iulianlounge.backend`. Si el código cambia, este fichero cambia en el mismo commit.
-El diseño amplio de la Fase 0 (salas, retos, préstamos, progreso) vive en [architecture.md](architecture.md) y no está implementado.
 
 ## 1. Base de datos
 
@@ -64,9 +63,9 @@ erDiagram
 Relaciones:
 
 - `users` 1 a 1 `wallet`. `wallet.user_id` es `NOT NULL` y `UNIQUE`: cada cartera tiene un dueño y nadie tiene dos. La BD admitiría un usuario sin cartera, pero el código evita que pase: `RegisterService` abre la cartera al registrar y V4 creó una vacía a cada usuario que ya existía.
-- `wallet` 1 a N `token_transaction`. El ledger solo crece (ADR-04) y `wallet.balance` es su caché.
+- `wallet` 1 a N `token_transaction`. El ledger solo crece y `wallet.balance` es su caché.
 - `users` 1 a N `blackjack_hand`, con `ON DELETE CASCADE` como `wallet`: la mano es estado de juego, no ledger. El ledger sigue bloqueando el borrado con `RESTRICT`.
-- Las fichas son `BIGINT`, nunca decimales (ADR-09).
+- Las fichas son `BIGINT`, nunca decimales.
 
 Restricciones e índices, con su migración:
 
@@ -79,7 +78,7 @@ Restricciones e índices, con su migración:
 | `wallet` | `UNIQUE (user_id)` | Una cartera por usuario como mucho. Es lo que hace la relación 1 a 0..1 | V4 |
 | `wallet` | `user_id` `REFERENCES users (id) ON DELETE CASCADE` | Borrar el usuario borra su cartera | V4 |
 | `wallet` | `CHECK (balance >= 0)` | Última defensa contra el saldo negativo, aunque Java fallara | V4 |
-| `token_transaction` | `wallet_id` `REFERENCES wallet (id) ON DELETE RESTRICT` | No se puede borrar una cartera con movimientos: el ledger no se pierde. Como la cartera cae en cascada con el usuario, hoy tampoco se puede borrar un usuario con movimientos. El borrado RGPD será una operación explícita (ADR-04) | V4 |
+| `token_transaction` | `wallet_id` `REFERENCES wallet (id) ON DELETE RESTRICT` | No se puede borrar una cartera con movimientos: el ledger no se pierde. Como la cartera cae en cascada con el usuario, hoy tampoco se puede borrar un usuario con movimientos. El borrado RGPD será una operación explícita | V4 |
 | `token_transaction` | `CHECK (amount <> 0)` | Un movimiento de 0 no es un movimiento | V4 |
 | `token_transaction` | `CHECK (balance_after >= 0)` | El saldo tras cada movimiento nunca es negativo | V4 |
 | `token_transaction` | `CHECK (char_length(idempotency_key) <= 64)` | Tope a la clave que inventa el cliente | V4 |
@@ -370,12 +369,12 @@ classDiagram
 ```
 
 - Las entidades no se enlazan con `@ManyToOne` ni `@OneToOne`. Cada una guarda el `UUID` de la otra (`Wallet.userId`, `TokenTransaction.walletId`), y por eso esas flechas son de puntos.
-- `TokenTransaction` no tiene setters y lleva `@Immutable`: el ledger no se edita (ADR-04).
+- `TokenTransaction` no tiene setters y lleva `@Immutable`: el ledger no se edita.
 - `Wallet.version` lleva `@Version`. Si hay dos escrituras a la vez, la segunda falla en vez de machacar a la primera.
 - `User` implementa `Persistable<UUID>` porque el id lo pone el servicio, no la BD. `isNew()` le dice a Spring Data si toca un `INSERT`. En `Wallet` y `TokenTransaction` el id lo genera Hibernate (`@GeneratedValue(strategy = GenerationType.UUID)`). El SQL no tiene `DEFAULT`.
 - `LanguageConverter` (`@Converter(autoApply = true)`, implementa `AttributeConverter<Language, String>`) guarda `Language` como `es` o `en`. `Role` y `TransactionType` se guardan por nombre (`@Enumerated(EnumType.STRING)`).
 - Valores fijos en el código: las copas de `Drink` cuestan 5, 10, 15, 25 y 40 fichas. Los rangos de `Rank` empiezan en 0, 25, 100 y 300 fichas gastadas en la barra.
-- `BarmanSituation.lineFor(rank)` devuelve una clave i18n (`barman.serve.habitual`, `barman.no_credit`) y no un texto (ADR-06).
+- `BarmanSituation.lineFor(rank)` devuelve una clave i18n (`barman.serve.habitual`, `barman.no_credit`) y no un texto.
 - El motor del blackjack es Java puro y sin estado: `BlackjackRules` recibe un `BlackjackTable` inmutable y devuelve otro. `HandTotal` cuenta el as como 11 mientras no se pase y después como 1. Ahí viven casi todos los tests de juego.
 - `BlackjackHand` guarda el mazo y la carta oculta del crupier y nunca se serializa: los controladores devuelven `HandView`. No sobrescribe `toString`, para que nada de la mano acabe en un log. Lleva `@Version` como `Wallet`.
 - `BetConverter` (`autoApply`) guarda la apuesta como `BIGINT` para poder sumarla. `CardsConverter` guarda las cartas como texto (`AS,TD,9C`) y una lista vacía como cadena vacía. `Outcome` y `HandStatus` se guardan por nombre.
@@ -518,7 +517,7 @@ classDiagram
 - `BlackjackService` tampoco lleva `@Transactional`, igual que `BarService`: cada cobro, cada pago y cada escritura de la mano van en su propia transacción. Lo que queda a medias lo arregla la reconciliación del inicio de cada llamada (apartado 5). El único método nuevo de `WalletService` es `movementsOf`, de solo lectura.
 - `UserService` usa `BarService` solo para sacar el rango que devuelve `GET /api/v1/me`.
 - `UserRepository` y `WalletRepository` extienden `JpaRepository`, y de ahí salen `findById` y `saveAndFlush`. `TokenTransactionRepository` y `BlackjackHandRepository` extienden `Repository` a secas, así que no exponen `delete` ni el `save` genérico.
-- `AuthService` devuelve el record `IssuedTokens`. `AuthController` monta y borra la cookie `refresh_token` con los métodos estáticos de `RefreshCookies` (ADR-08).
+- `AuthService` devuelve el record `IssuedTokens`. `AuthController` monta y borra la cookie `refresh_token` con los métodos estáticos de `RefreshCookies`.
 - `JwtService` está en el paquete `security`, no en `service`.
 
 ### 3.2 Cadena de seguridad y errores
@@ -634,10 +633,10 @@ classDiagram
 
   En la barra cuentan juntos el pedido y el fiado. En la mesa, el reparto, `hit` y `stand` (una mano son de 2 a 8 `POST`). Los presupuestos son separados: jugar no cierra la barra. La carta (`GET /api/v1/bar`) y la mesa (`GET /api/v1/blackjack`) no tienen límite. Sin sesión deja pasar la petición para que la seguridad conteste el 401. Si el contador se llena (10.000 socios distintos en un minuto), deja pasar a los nuevos en vez de cerrar el bar a todos: el saldo ya acota lo que puede gastar cada uno.
 - `AuthRateLimitFilter` solo actúa en `POST /api/v1/auth/login` y `POST /api/v1/auth/register`. Por defecto deja 20 peticiones por minuto por IP y ruta. A partir de ahí responde 429 `auth.too_many_requests` con la cabecera `Retry-After: 60`. También rechaza con 429 las claves nuevas si, después de barrer las caducadas, sigue habiendo 10.000 claves (IP y ruta) vivas.
-- `JwtAuthenticationFilter` valida el `Bearer`, mete `AccessTokenClaims` en el `SecurityContext` con la autoridad `ROLE_` + rol y deja seguir. Si el token no vale, limpia el contexto y se traga la `InvalidTokenException`. Luego la regla `anyRequest().authenticated()` responde 401 con `ProblemDetailAuthenticationEntryPoint` (ADR-08). Por eso no llevar token y llevar uno caducado o inválido dan el mismo 401 `auth.required`, no `auth.invalid_token`.
+- `JwtAuthenticationFilter` valida el `Bearer`, mete `AccessTokenClaims` en el `SecurityContext` con la autoridad `ROLE_` + rol y deja seguir. Si el token no vale, limpia el contexto y se traga la `InvalidTokenException`. Luego la regla `anyRequest().authenticated()` responde 401 con `ProblemDetailAuthenticationEntryPoint`. Por eso no llevar token y llevar uno caducado o inválido dan el mismo 401 `auth.required`, no `auth.invalid_token`.
 - Los errores de los filtros no pasan por `GlobalExceptionHandler`, porque los filtros corren antes del `DispatcherServlet`. El 429 y el 401 escriben el JSON a mano con `key()` y `detail()` de su `ErrorCode`.
 - `MeController`, `WalletController`, `BarController` y `BlackjackController` reciben las claims con `@AuthenticationPrincipal(errorOnInvalidType = true)`. El `userId` sale del token, nunca del body. Los endpoints de `AuthController` son públicos y no reciben claims.
-- Cada excepción de negocio extiende `ApiException` y lleva uno de los 22 `ErrorCode`. `GlobalExceptionHandler` la convierte en `ProblemDetail` con un `code` estable (`wallet.insufficient_funds`). El texto lo pone el frontend (ADR-06).
+- Cada excepción de negocio extiende `ApiException` y lleva uno de los 22 `ErrorCode`. `GlobalExceptionHandler` la convierte en `ProblemDetail` con un `code` estable (`wallet.insufficient_funds`). El texto lo pone el frontend.
 - `GlobalExceptionHandler` extiende `ResponseEntityExceptionHandler`. Un body inválido da 400 `validation.failed` con el mapa `errors`. Al resto de errores de Spring MVC sin `code` les pone `request.rejected`. El 401 de un refresh inválido borra además la cookie `refresh_token`.
 
 ## 4. Pedir una copa

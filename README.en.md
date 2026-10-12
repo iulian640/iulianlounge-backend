@@ -49,7 +49,7 @@ docker compose up -d        # PostgreSQL
 
 The frontend dev server proxies `/api` to `localhost:8080`.
 
-Without `ANTHROPIC_API_KEY` the bartender never touches the network and always answers with the fixed line. The reasoning is in the 2026-10-07 amendment of [ADR-05](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md).
+Without `ANTHROPIC_API_KEY` the bartender never touches the network and always answers with the fixed line.
 
 ## Tests
 
@@ -90,7 +90,7 @@ Base path `/api/v1`, 15 endpoints. Responses are plain JSON, no envelope. "JWT" 
 
 `GET /actuator/health` is also public and is the only Actuator endpoint exposed.
 
-Errors follow RFC 7807 (`ProblemDetail`) with a stable `code`. The frontend translates the `code`; `detail` is English and only for debugging ([ADR-06](docs/adr/ADR-06-i18n-claves-backend-textos-frontend.en.md)):
+Errors follow RFC 7807 (`ProblemDetail`) with a stable `code`. The frontend translates the `code`; `detail` is English and only for debugging:
 
 ```json
 {
@@ -106,7 +106,7 @@ The full list of codes is in [`ErrorCode`](src/main/java/com/iulianlounge/backen
 ## Security
 
 - Spring Security with no server session and a custom `OncePerRequestFilter` for the JWT (jjwt). The access token is short-lived and the frontend keeps it in memory.
-- The refresh token travels in an `HttpOnly; Secure; SameSite=Strict` cookie. Logout clears it in the browser; the server does not revoke it, so a stolen refresh token stays valid until it expires ([ADR-08](docs/adr/ADR-08-jwt-stateless-con-refresh-token.en.md)).
+- The refresh token travels in an `HttpOnly; Secure; SameSite=Strict` cookie. Logout clears it in the browser; the server does not revoke it, so a stolen refresh token stays valid until it expires.
 - Passwords use BCrypt. If the user does not exist, login compares against a dummy hash so response time does not give it away.
 - `AuthRateLimitFilter` limits login and register per IP. `MemberRateLimitFilter` limits orders, bets and `talk` per member.
 - Behind the proxy, the client IP is resolved with `server.forward-headers-strategy=native`. Caddy strips forwarding headers the client could spoof.
@@ -167,7 +167,7 @@ PostgreSQL 17 in Docker and Flyway migrations V1 to V7:
 | `V6__index_and_sign_bar_movements.sql` | Index by wallet and type, and the sign of `BAR_ORDER` |
 | `V7__create_blackjack_hand_and_ledger_types.sql` | Hands table and blackjack types |
 
-The ledger is append-only and the balance is materialized in `wallet` ([ADR-04](docs/adr/ADR-04-ledger-append-only-saldo-materializado.en.md)). Amounts are `long` in Java and `bigint` in the database ([ADR-09](docs/adr/ADR-09-fichas-enteros-long-prohibido-double.en.md)). Indexes, class diagrams and the sequences for ordering a drink and dealing a hand are in [docs/diagramas.md](docs/diagramas.md) (Spanish).
+The ledger is append-only and the balance is materialized in `wallet`. Amounts are `long` in Java and `bigint` in the database. Indexes, class diagrams and the sequences for ordering a drink and dealing a hand are in [docs/diagramas.md](docs/diagramas.md) (Spanish).
 
 ```mermaid
 erDiagram
@@ -228,30 +228,7 @@ Production runs at https://iulianlounge.com on an Oracle Cloud ARM instance in M
 
 ## Documentation
 
-| Document | Content |
-|---|---|
-| [CONCEPT.en.md](CONCEPT.en.md) | Product concept |
-| [docs/architecture.en.md](docs/architecture.en.md) | Technical architecture |
-| [docs/diagramas.md](docs/diagramas.md) | ER and class diagrams in Mermaid (Spanish) |
-| [docs/ficcion.en.md](docs/ficcion.en.md) | The club's fiction |
-| [docs/devlog.md](docs/devlog.md) | Dev log (Spanish) |
-| [docs/enunciado.en.md](docs/enunciado.en.md) | Project brief |
-
-Most of it exists in Spanish and English (`*.en.md`).
-
-### ADRs
-
-ADRs 01 to 03 and 07 are summarised in [architecture.en.md](docs/architecture.en.md) and get their own file when they are implemented.
-
-| ADR | Topic |
-|---|---|
-| [04](docs/adr/ADR-04-ledger-append-only-saldo-materializado.en.md) | Append-only ledger and materialized balance |
-| [05](docs/adr/ADR-05-barman-llm-function-calling-lista-blanca.en.md) | LLM bartender (function calling dropped in the 2026-10-07 amendment) |
-| [06](docs/adr/ADR-06-i18n-claves-backend-textos-frontend.en.md) | i18n: keys in the backend, texts in the frontend |
-| [08](docs/adr/ADR-08-jwt-stateless-con-refresh-token.en.md) | Stateless JWT with refresh token |
-| [09](docs/adr/ADR-09-fichas-enteros-long-prohibido-double.en.md) | Amounts as integers, no `double` |
-| [10](docs/adr/ADR-10-la-barra.md) | The bar: fixed menu, rank derived from spending, daily house credit (Spanish only) |
-| [11](docs/adr/ADR-11-blackjack.md) | Single-hand blackjack, server-authoritative (Spanish only) |
+The ER, class and sequence diagrams, in Mermaid, are in [docs/diagramas.md](docs/diagramas.md) (Spanish).
 
 ## Process
 
