@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### Claude Code ###
+.claude/
+
 ### Secretos (deploy/.env en el servidor, nunca en git) ###
 .env
 *.env
